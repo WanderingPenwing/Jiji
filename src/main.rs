@@ -1,15 +1,23 @@
 use eframe::egui;
-use std::{thread, time};
+use image::GenericImageView;
+use std::{
+	thread, 
+	time, 
+	sync::Arc,
+	error::Error,
+};
 
 
 const MAX_FPS : f32 = 30.0;
 
 
 fn main() -> Result<(), eframe::Error> {
-
+	let icon_data = load_icon().unwrap_or_default();
+	
 	let options = eframe::NativeOptions {
 		viewport: egui::ViewportBuilder::default()
-			.with_inner_size([1200.0, 800.0]),
+			.with_inner_size([1200.0, 800.0])
+			.with_icon(Arc::new(icon_data)),
 		..Default::default()
 	};
 
@@ -54,4 +62,20 @@ impl Jiji {
 			ui.label("Hello there");
 		});
 	}
+}
+
+pub fn load_icon() -> Result<egui::IconData, Box<dyn Error>> {
+	let (icon_rgba, icon_width, icon_height) = {
+		let icon = include_bytes!("../assets/icon.png");
+		let image = image::load_from_memory(icon)?;
+		let rgba = image.clone().into_rgba8().to_vec();
+		let (width, height) = image.dimensions();
+		(rgba, width, height)
+	};
+
+	Ok(egui::IconData {
+		rgba: icon_rgba,
+		width: icon_width,
+		height: icon_height,
+	})
 }
