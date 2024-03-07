@@ -1,1 +1,0 @@
-pub const TOKEN : &str = "MTIxNTIwMzEyMTk5NTcxNDU4MQ.GOElxa.8N8MN14errNPxwjCXU6_6Y8C-moZh-lLMeugMo";

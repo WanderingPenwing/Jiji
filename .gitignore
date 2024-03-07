@@ -11,4 +11,4 @@ Cargo.lock
 **/*.rs.bk
 
 # DO not put the token online 
-src/token.rs
+**/token.rs
