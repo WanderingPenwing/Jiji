@@ -26,14 +26,19 @@ impl EventHandler for Handler {
 	}
 }
 
-pub async fn start_discord_bot() -> Result<Client, String> {
-	let mut client = Client::builder(token::TOKEN)
+pub async fn start_discord_bot() {
+	let maybe_client = Client::builder(token::TOKEN)
 		.event_handler(Handler)
 		.await
-		.map_err(|why| format!("Client error: {:?}", why))?;
-
-	if let Err(why) = client.start().await {
-		return Err(format!("Client error: {:?}", why));
+		.map_err(|why| format!("Client error: {:?}", why));
+	
+	if let Ok(mut client) = maybe_client {
+		if let Err(why) = client.start().await {
+			eprintln!("Client error: {:?}", why);
+			return
+		}
+	} else {
+		eprintln!("No Client");
+		return
 	}
-	Ok(client)
 }

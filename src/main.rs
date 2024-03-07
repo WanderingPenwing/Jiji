@@ -1,8 +1,6 @@
 use eframe::egui;
 use image::GenericImageView;
-use serenity::prelude::*;
-use std::{error::Error, sync::Arc, thread, time, future::Future};
-
+use std::{error::Error, sync::Arc, thread, time};
 mod bot;
 
 const MAX_FPS: f32 = 30.0;
@@ -26,16 +24,16 @@ fn main() -> Result<(), eframe::Error> {
 
 struct Jiji {
 	next_frame: time::Instant,
-	bot: Option<Client>,
-	bot_future: Option<Box<dyn Future<Output = Result<Client, String>>>>,
+	bot: thread::JoinHandle<()>,
 }
 
 impl Default for Jiji {
 	fn default() -> Self {
 		Self {
 			next_frame: time::Instant::now(),
-			bot: None,
-			bot_future: Some(Box::new(bot::start_discord_bot())),
+			bot: thread::spawn(|| {
+				bot::start_discord_bot();
+			}),
 		}
 	}
 }
