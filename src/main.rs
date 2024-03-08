@@ -8,13 +8,11 @@ mod bot;
 const MAX_FPS: f32 = 30.0;
 
 fn main() {
-	println!("hello there");
-
-	let handle = thread::spawn(|| {
-		println!("general kenobi");
-        let mut rt = Runtime::new().unwrap();
-        rt.block_on(bot::start_discord_bot());
-    });
+	let _handle = thread::spawn(|| {
+		println!("Bot thread spawned");
+		let mut rt = Runtime::new().unwrap();
+		rt.block_on(bot::start_discord_bot());
+	});
 
 	// Run the GUI on the main thread
 	gui();
@@ -25,7 +23,7 @@ fn gui() {
 
 	let options = eframe::NativeOptions {
 		viewport: egui::ViewportBuilder::default()
-			.with_inner_size([1200.0, 800.0])
+			.with_inner_size([400.0, 300.0])
 			.with_icon(Arc::new(icon_data)),
 		..Default::default()
 	};
