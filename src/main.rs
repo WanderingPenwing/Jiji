@@ -1,24 +1,27 @@
 use eframe::egui;
 use image::GenericImageView;
-use std::{error::Error, sync::Arc, thread, time};
+use std::{error::Error, sync::Arc, sync::mpsc, thread, time};
 use tokio::runtime::Runtime;
 
 mod bot;
+mod postman;
 
 const MAX_FPS: f32 = 30.0;
 
 fn main() {
-	let _handle = thread::spawn(|| {
+	let (tx, rx) = mpsc::channel::<postman::Message>(); //tx transmiter
+	
+	let _handle = thread::spawn(move || {
 		println!("Bot thread spawned");
 		let mut rt = Runtime::new().unwrap();
-		rt.block_on(bot::start_discord_bot());
+		rt.block_on(bot::start_discord_bot(tx));
 	});
 
 	// Run the GUI on the main thread
-	gui();
+	gui(rx);
 }
 
-fn gui() {
+fn gui(receiver: mpsc::Receiver<postman::Message>) {
 	let icon_data = load_icon().unwrap_or_default();
 
 	let options = eframe::NativeOptions {
@@ -28,17 +31,19 @@ fn gui() {
 		..Default::default()
 	};
 
-	let _ = eframe::run_native("Jiji", options, Box::new(move |_cc| Box::from(Jiji::new())));
+	let _ = eframe::run_native("Jiji", options, Box::new(move |_cc| Box::from(Jiji::new(receiver))));
 }
 
 struct Jiji {
 	next_frame: time::Instant,
+	receiver: mpsc::Receiver<postman::Message>,
 }
 
 impl Jiji {
-	fn new() -> Self {
+	fn new(receiver: mpsc::Receiver<postman::Message>) -> Self {
 		Self {
 			next_frame: time::Instant::now(),
+			receiver,
 		}
 	}
 }

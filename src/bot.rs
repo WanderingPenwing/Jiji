@@ -3,6 +3,8 @@ use serenity::{
 	model::{channel::Message, gateway::Ready},
 	prelude::*,
 };
+use std::sync::mpsc;
+use crate::postman;
 
 mod token;
 
@@ -29,21 +31,33 @@ impl EventHandler for Handler {
 		println!("{} is connected!", ready.user.name);
 		let guilds = context.cache.guilds().await;
 		
+		let mut guild_names : Vec<String> = vec![];
+		
 		for guild_id in guilds {
 			let guild_name : String = if let Some(guild) = context.cache.guild(guild_id).await {
-	            guild.name.clone()
-	        } else {
-	            "not found".to_string()
-	        };
+				guild.name.clone()
+			} else {
+				"not found".to_string()
+			};
+			guild_names.push(guild_name.clone());
 			println!("Guild : '{}' ({})", guild_id, guild_name);
+		}
+		
+		if let Some(sender) = context.data.read().await.get::<postman::Sender>() {
+			let message = postman::Message::new(postman::MessageType::GuildName, guild_names[0].clone());
+			sender.send(message).unwrap();
+			println!("Message from bot to gui, sent");
+		} else {
+			println!("Failed to retrieve sender");
 		}
 	}
 }
 
-pub async fn start_discord_bot() {
+pub async fn start_discord_bot(sender: mpsc::Sender<postman::Message>) {
 	println!("Bot connection process started...");
 	let maybe_client = Client::builder(token::TOKEN)
 		.event_handler(Handler)
+		.type_map_insert::<postman::Sender>(sender)
 		.await
 		.map_err(|why| format!("Client error: {:?}", why));
 
