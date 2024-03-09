@@ -1,13 +1,13 @@
 use std::sync::mpsc;
 use serenity::prelude::TypeMapKey;
 
-pub struct Message {
-	kind: MessageType,
-	content: String,
+pub struct Packet {
+	pub kind: PacketKind,
+	pub content: String,
 }
 
-impl Message {
-	pub fn new(kind : MessageType, content: String) -> Self {
+impl Packet {
+	pub fn new(kind : PacketKind, content: String) -> Self {
 		Self {
 			kind,
 			content,
@@ -16,12 +16,12 @@ impl Message {
 }
 
 
-pub enum MessageType {
+pub enum PacketKind {
 	GuildName,
 }
 
 pub struct Sender;
 
 impl TypeMapKey for Sender {
-    type Value = mpsc::Sender<Message>;
+	type Value = mpsc::Sender<Packet>;
 }

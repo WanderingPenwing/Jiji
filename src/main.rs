@@ -9,7 +9,7 @@ mod postman;
 const MAX_FPS: f32 = 30.0;
 
 fn main() {
-	let (tx, rx) = mpsc::channel::<postman::Message>(); //tx transmiter
+	let (tx, rx) = mpsc::channel::<postman::Packet>(); //tx transmiter
 	
 	let _handle = thread::spawn(move || {
 		println!("Bot thread spawned");
@@ -21,7 +21,7 @@ fn main() {
 	gui(rx);
 }
 
-fn gui(receiver: mpsc::Receiver<postman::Message>) {
+fn gui(receiver: mpsc::Receiver<postman::Packet>) {
 	let icon_data = load_icon().unwrap_or_default();
 
 	let options = eframe::NativeOptions {
@@ -36,11 +36,11 @@ fn gui(receiver: mpsc::Receiver<postman::Message>) {
 
 struct Jiji {
 	next_frame: time::Instant,
-	receiver: mpsc::Receiver<postman::Message>,
+	receiver: mpsc::Receiver<postman::Packet>,
 }
 
 impl Jiji {
-	fn new(receiver: mpsc::Receiver<postman::Message>) -> Self {
+	fn new(receiver: mpsc::Receiver<postman::Packet>) -> Self {
 		Self {
 			next_frame: time::Instant::now(),
 			receiver,
@@ -54,6 +54,10 @@ impl eframe::App for Jiji {
 			((1.0 / MAX_FPS) - self.next_frame.elapsed().as_secs_f32()).max(0.0),
 		));
 		self.next_frame = time::Instant::now();
+		
+		while let Ok(packet) = self.receiver.try_recv() {
+			println!("Message from bot to gui received : {}", packet.content);
+		}
 
 		self.draw_feed(ctx);
 	}

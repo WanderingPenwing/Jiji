@@ -44,7 +44,7 @@ impl EventHandler for Handler {
 		}
 		
 		if let Some(sender) = context.data.read().await.get::<postman::Sender>() {
-			let message = postman::Message::new(postman::MessageType::GuildName, guild_names[0].clone());
+			let message = postman::Packet::new(postman::PacketKind::GuildName, guild_names[0].clone());
 			sender.send(message).unwrap();
 			println!("Message from bot to gui, sent");
 		} else {
@@ -53,7 +53,7 @@ impl EventHandler for Handler {
 	}
 }
 
-pub async fn start_discord_bot(sender: mpsc::Sender<postman::Message>) {
+pub async fn start_discord_bot(sender: mpsc::Sender<postman::Packet>) {
 	println!("Bot connection process started...");
 	let maybe_client = Client::builder(token::TOKEN)
 		.event_handler(Handler)
