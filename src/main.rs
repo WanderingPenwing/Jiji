@@ -5,6 +5,7 @@ use tokio::runtime::Runtime;
 
 mod bot;
 mod postman;
+mod discord_structure;
 
 const MAX_FPS: f32 = 30.0;
 
@@ -37,6 +38,7 @@ fn gui(receiver: mpsc::Receiver<postman::Packet>) {
 struct Jiji {
 	next_frame: time::Instant,
 	receiver: mpsc::Receiver<postman::Packet>,
+	guilds: Vec<discord_structure::Guild>,
 }
 
 impl Jiji {
@@ -44,6 +46,7 @@ impl Jiji {
 		Self {
 			next_frame: time::Instant::now(),
 			receiver,
+			guilds: vec![],
 		}
 	}
 }
@@ -56,7 +59,17 @@ impl eframe::App for Jiji {
 		self.next_frame = time::Instant::now();
 		
 		while let Ok(packet) = self.receiver.try_recv() {
-			println!("Message from bot to gui received : {}", packet.content);
+			match packet {
+				postman::Packet::Guild(guild) => {
+			        println!("gui : guild received : '{}'", guild.name);
+			    }
+			    postman::Packet::Channel(channel) => {
+			        println!("gui : channel received : '{}'", channel.name);
+			    }
+			    postman::Packet::Message(message) => {
+			        println!("gui : message received : '{}'", message.content);
+			    }
+			}
 		}
 
 		self.draw_feed(ctx);

@@ -5,6 +5,7 @@ use serenity::{
 };
 use std::sync::mpsc;
 use crate::postman;
+use crate::discord_structure;
 
 mod token;
 
@@ -12,6 +13,7 @@ const HELP_MESSAGE: &str = "Hello there, Human! I am a messenger for the wanderi
 const HELP_COMMAND: &str = "!jiji";
 
 struct Handler;
+
 
 #[async_trait]
 impl EventHandler for Handler {
@@ -31,22 +33,18 @@ impl EventHandler for Handler {
 		println!("{} is connected!", ready.user.name);
 		let guilds = context.cache.guilds().await;
 		
-		let mut guild_names : Vec<String> = vec![];
-		
-		for guild_id in guilds {
-			let guild_name : String = if let Some(guild) = context.cache.guild(guild_id).await {
-				guild.name.clone()
-			} else {
-				"not found".to_string()
-			};
-			guild_names.push(guild_name.clone());
-			println!("Guild : '{}' ({})", guild_id, guild_name);
-		}
-		
 		if let Some(sender) = context.data.read().await.get::<postman::Sender>() {
-			let message = postman::Packet::new(postman::PacketKind::GuildName, guild_names[0].clone());
-			sender.send(message).unwrap();
-			println!("Message from bot to gui, sent");
+			for guild_id in guilds {
+				let guild_name : String = if let Some(guild) = context.cache.guild(guild_id).await {
+					guild.name.clone()
+				} else {
+					"not found".to_string()
+				};
+				println!("Guild : '{}' ({})", guild_name.clone(), guild_id.clone());
+				
+				let guild = discord_structure::Guild::new(guild_name, guild_id.to_string());
+				sender.send(postman::Packet::Guild(guild)).expect("Failed to send packet");
+			}
 		} else {
 			println!("Failed to retrieve sender");
 		}
