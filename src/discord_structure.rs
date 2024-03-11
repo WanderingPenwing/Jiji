@@ -1,4 +1,4 @@
-
+#[derive(PartialEq, Clone)]
 pub struct Guild {
 	pub name: String,
 	pub id: String,
@@ -15,7 +15,7 @@ impl Guild {
 	}
 }
 
-
+#[derive(PartialEq, Clone)]
 pub struct Channel {
 	pub name: String,
 	pub id: String,
@@ -34,7 +34,7 @@ impl Channel {
 	}
 }
 
-
+#[derive(PartialEq, Clone)]
 pub struct Message {
 	pub author_name: String,
 	pub id: String,

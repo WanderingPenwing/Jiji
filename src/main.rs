@@ -2,6 +2,7 @@ use eframe::egui;
 use image::GenericImageView;
 use std::{error::Error, sync::Arc, sync::mpsc, thread, time};
 use tokio::runtime::Runtime;
+use std::sync::Mutex;
 
 mod bot;
 mod postman;
@@ -10,19 +11,21 @@ mod discord_structure;
 const MAX_FPS: f32 = 30.0;
 
 fn main() {
-	let (tx, rx) = mpsc::channel::<postman::Packet>(); //tx transmiter
+	let (bot_tx, gui_rx) = mpsc::channel::<postman::Packet>(); //tx transmiter
+	let (gui_tx, bot_rx) = mpsc::channel::<postman::Packet>(); //tx transmiter
+	let bot_rx = Mutex::new(bot_rx);
 	
 	let _handle = thread::spawn(move || {
-		println!("Bot thread spawned");
+		println!("main : bot thread spawned");
 		let mut rt = Runtime::new().unwrap();
-		rt.block_on(bot::start_discord_bot(tx));
+		rt.block_on(bot::start_discord_bot(bot_tx, bot_rx));
 	});
 
 	// Run the GUI on the main thread
-	gui(rx);
+	gui(gui_tx, gui_rx);
 }
 
-fn gui(receiver: mpsc::Receiver<postman::Packet>) {
+fn gui(sender: mpsc::Sender<postman::Packet>, receiver: mpsc::Receiver<postman::Packet>) {
 	let icon_data = load_icon().unwrap_or_default();
 
 	let options = eframe::NativeOptions {
@@ -32,21 +35,25 @@ fn gui(receiver: mpsc::Receiver<postman::Packet>) {
 		..Default::default()
 	};
 
-	let _ = eframe::run_native("Jiji", options, Box::new(move |_cc| Box::from(Jiji::new(receiver))));
+	let _ = eframe::run_native("Jiji", options, Box::new(move |_cc| Box::from(Jiji::new(sender, receiver))));
 }
 
 struct Jiji {
 	next_frame: time::Instant,
+	sender: mpsc::Sender<postman::Packet>,
 	receiver: mpsc::Receiver<postman::Packet>,
 	guilds: Vec<discord_structure::Guild>,
+	selected_guild: Option<discord_structure::Guild>,
 }
 
 impl Jiji {
-	fn new(receiver: mpsc::Receiver<postman::Packet>) -> Self {
+	fn new(sender: mpsc::Sender<postman::Packet>, receiver: mpsc::Receiver<postman::Packet>) -> Self {
 		Self {
 			next_frame: time::Instant::now(),
+			sender,
 			receiver,
 			guilds: vec![],
+			selected_guild: None,
 		}
 	}
 }
@@ -61,14 +68,18 @@ impl eframe::App for Jiji {
 		while let Ok(packet) = self.receiver.try_recv() {
 			match packet {
 				postman::Packet::Guild(guild) => {
-			        println!("gui : guild received : '{}'", guild.name);
-			    }
-			    postman::Packet::Channel(channel) => {
-			        println!("gui : channel received : '{}'", channel.name);
-			    }
-			    postman::Packet::Message(message) => {
-			        println!("gui : message received : '{}'", message.content);
-			    }
+					println!("gui : guild received : '{}'", guild.name);
+					self.guilds.push(guild);
+				}
+				postman::Packet::Channel(channel) => {
+					println!("gui : channel received : '{}'", channel.name);
+				}
+				postman::Packet::Message(message) => {
+					println!("gui : message received : '{}'", message.content);
+				}
+				_ => {
+					println!("unhandled packet");
+				}
 			}
 		}
 
@@ -82,8 +93,43 @@ impl eframe::App for Jiji {
 
 impl Jiji {
 	pub fn draw_feed(&mut self, ctx: &egui::Context) {
+		egui::TopBottomPanel::top("server_selection")
+			.resizable(false)
+			.show(ctx, |ui| {
+				ui.horizontal(|ui| {
+					ui.label("Where do you want to look ? ");
+					let selected_text = if let Some(guild) = &self.selected_guild {
+						guild.name.clone()
+					} else {
+						"None".to_string()
+					};
+					
+					egui::ComboBox::from_label("")
+						.selected_text(format!("{}", selected_text))
+						.show_ui(ui, |ui| {
+							ui.style_mut().wrap = Some(false);
+							ui.set_min_width(60.0);
+							if ui.add(egui::SelectableLabel::new(self.selected_guild == None, "None")).clicked() {
+							    self.selected_guild = None;
+							}
+							for guild in self.guilds.clone() {
+								if ui.add(egui::SelectableLabel::new(self.selected_guild == Some(guild.clone()), guild.name.clone())).clicked() {
+								    self.selected_guild = Some(guild);
+								}
+							}
+						});
+					
+					if let Some(guild) = &self.selected_guild {
+						if guild.channels.len() == 0 {
+							if ui.add(egui::Button::new("get channels")).clicked() {
+								let _ = self.sender.send(postman::Packet::FetchChannels(guild.id.clone()));
+							}
+						}
+					}
+				});
+			});
 		egui::CentralPanel::default().show(ctx, |ui| {
-			ui.label("Hello there");
+			ui.label("General Kenobi");
 		});
 	}
 }
