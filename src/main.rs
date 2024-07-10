@@ -43,7 +43,8 @@ struct Jiji {
 	sender: mpsc::Sender<postman::Packet>,
 	receiver: mpsc::Receiver<postman::Packet>,
 	guilds: Vec<discord_structure::Guild>,
-	selected_guild: Option<discord_structure::Guild>,
+	selected_guild: Option<usize>,
+	selected_channel: Option<usize>,
 }
 
 impl Jiji {
@@ -54,6 +55,7 @@ impl Jiji {
 			receiver,
 			guilds: vec![],
 			selected_guild: None,
+			selected_channel: None,
 		}
 	}
 }
@@ -73,6 +75,13 @@ impl eframe::App for Jiji {
 				}
 				postman::Packet::Channel(channel) => {
 					println!("gui : channel received : '{}'", channel.name);
+					 for i in 0..self.guilds.len() {
+						if self.guilds[i].id != channel.guild_id {
+							continue
+						}
+						self.guilds[i].channels.push(channel.clone());
+						println!("gui : channel added to '{}'", self.guilds[i].name);
+					}
 				}
 				postman::Packet::Message(message) => {
 					println!("gui : message received : '{}'", message.content);
@@ -98,32 +107,56 @@ impl Jiji {
 			.show(ctx, |ui| {
 				ui.horizontal(|ui| {
 					ui.label("Where do you want to look ? ");
-					let selected_text = if let Some(guild) = &self.selected_guild {
-						guild.name.clone()
+					let selected_guild_text = if let Some(selected_guild_index) = &self.selected_guild {
+						self.guilds[*selected_guild_index].name.clone()
 					} else {
 						"None".to_string()
 					};
 					
 					egui::ComboBox::from_label("")
-						.selected_text(format!("{}", selected_text))
+						.selected_text(format!("{}", selected_guild_text))
 						.show_ui(ui, |ui| {
 							ui.style_mut().wrap = Some(false);
 							ui.set_min_width(60.0);
 							if ui.add(egui::SelectableLabel::new(self.selected_guild == None, "None")).clicked() {
-							    self.selected_guild = None;
+								self.selected_guild = None;
 							}
-							for guild in self.guilds.clone() {
-								if ui.add(egui::SelectableLabel::new(self.selected_guild == Some(guild.clone()), guild.name.clone())).clicked() {
-								    self.selected_guild = Some(guild);
+							for i in 0..self.guilds.len() {
+								if ui.add(egui::SelectableLabel::new(self.selected_guild == Some(i), self.guilds[i].name.clone())).clicked() {
+									self.selected_guild = Some(i);
 								}
 							}
 						});
+						
 					
-					if let Some(guild) = &self.selected_guild {
-						if guild.channels.len() == 0 {
+					if let Some(selected_guild_index) = &self.selected_guild {
+						if self.guilds[*selected_guild_index].channels.len() == 0 {
 							if ui.add(egui::Button::new("get channels")).clicked() {
-								let _ = self.sender.send(postman::Packet::FetchChannels(guild.id.clone()));
+								let _ = self.sender.send(postman::Packet::FetchChannels(self.guilds[*selected_guild_index].id.clone()));
 							}
+						} else {
+						
+							let selected_channel_text = if let Some(selected_channel_index) = &self.selected_channel {
+								self.guilds[*selected_guild_index].channels[*selected_channel_index].name.clone()
+							} else {
+								"None".to_string()
+							};
+							
+							egui::ComboBox::from_label(":")
+								.selected_text(format!("{}", selected_channel_text))
+								.show_ui(ui, |ui| {
+									ui.style_mut().wrap = Some(false);
+									ui.set_min_width(60.0);
+									if ui.add(egui::SelectableLabel::new(self.selected_channel == None, "None")).clicked() {
+										self.selected_channel = None;
+									}
+									for i in 0..self.guilds[*selected_guild_index].channels.len() {
+										if ui.add(egui::SelectableLabel::new(self.selected_channel == Some(i), self.guilds[*selected_guild_index].channels[i].name.clone())).clicked() {
+											self.selected_channel = Some(i);
+										}
+									}
+								});
+							
 						}
 					}
 				});

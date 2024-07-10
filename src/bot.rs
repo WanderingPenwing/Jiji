@@ -3,7 +3,7 @@ use serenity::{
 	model::{channel::Message, gateway::Ready},
 	prelude::*,
 };
-use serenity::model::prelude::GuildId;
+use serenity::model::prelude::ChannelType;
 use std::sync::mpsc;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -17,7 +17,7 @@ use crate::discord_structure;
 mod token;
 
 const HELP_MESSAGE: &str = "Hello there, Human! I am a messenger for the wandering penwing.";
-const HELP_COMMAND: &str = "!jiji";
+const HELP_COMMAND: &str = "!penwing";
 const PACKET_REFRESH : u64 = 500;
 
 struct Handler {
@@ -38,50 +38,45 @@ impl EventHandler for Handler {
 		}
 	}
 
-	async fn ready(&self, context: Context, ready: Ready) {
+	async fn ready(&self, _context: Context, ready: Ready) {
 		println!("bot : {} is connected!", ready.user.name);
 	}
 	
-	async fn cache_ready(&self, context: Context, _guilds: Vec<GuildId>) {
+	async fn cache_ready(&self, context: Context, _guilds: Vec<serenity::model::prelude::GuildId>) {
 		println!("bot : cache built successfully!");
 		
 		let context = Arc::new(context);
 		
 		if !self.is_loop_running.load(Ordering::Relaxed) {
-            // We have to clone the Arc, as it gets moved into the new thread.
-            let context1 = Arc::clone(&context);
-            // tokio::spawn creates a new green thread that can run in parallel with the rest of
-            // the application.
-            tokio::spawn(async move {
-                get_guilds(&context1).await;
-            });
+			// We have to clone the Arc, as it gets moved into the new thread.
+			let context1 = Arc::clone(&context);
+			// tokio::spawn creates a new green thread that can run in parallel with the rest of
+			// the application.
+			tokio::spawn(async move {
+				get_guilds(&context1).await;
+			});
 
 			let context2 = Arc::clone(&context);
-            tokio::spawn(async move {
-                loop {
-                    check_packets(&context2).await;
-                    thread::sleep(Duration::from_millis(PACKET_REFRESH));
-                }
-            });
+			tokio::spawn(async move {
+				loop {
+					check_packets(&context2).await;
+					thread::sleep(Duration::from_millis(PACKET_REFRESH));
+				}
+			});
 
-            // Now that the loop is running, we set the bool to true
-            self.is_loop_running.swap(true, Ordering::Relaxed);
-        }
+			// Now that the loop is running, we set the bool to true
+			self.is_loop_running.swap(true, Ordering::Relaxed);
+		}
 	}
 }
 
 async fn check_packets(context: &Context) {
+	let mut packets_received : Vec<postman::Packet> = vec![];
+	
 	if let Some(receiver_mutex) = context.data.read().await.get::<postman::Receiver>() {
 		if let Ok(receiver) = receiver_mutex.lock() {
 			while let Ok(packet) = receiver.try_recv() {
-				match packet {
-					postman::Packet::FetchChannels(guild_id) => {
-						println!("bot : fetch channels request received : '{}'", guild_id);
-					}
-					_ => {
-						println!("bot : unhandled packet");
-					}
-				}
+				packets_received.push(packet);
 			}
 		} else {
 			println!("bot : failed to lock receiver");
@@ -89,7 +84,51 @@ async fn check_packets(context: &Context) {
 	} else {
 		println!("bot : failed to retrieve receiver");
 	}
+
+	for packet in packets_received {
+		match packet {
+			postman::Packet::FetchChannels(guild_id_str) => {
+				println!("bot : received FetchChannels packet, id '{}'", guild_id_str);
+				match guild_id_str.parse::<u64>() {
+					Ok(guild_id_u64) => {
+						if let Some(guild) = context.cache.guild(guild_id_u64).await {
+							match guild.channels(&context.http).await {
+								Ok(guild_channels) => {
+									if let Some(sender) = context.data.read().await.get::<postman::Sender>() {
+										for (channel_id, channel) in guild_channels {
+											if channel.kind != ChannelType::Text {
+												continue
+											}
+											let discord_channel = discord_structure::Channel::new(channel.name, format!("{}",channel_id), guild_id_str.to_string());
+											sender.send(postman::Packet::Channel(discord_channel)).expect("Failed to send packet");
+										}
+										println!("bot : sent channels");
+									} else {
+										println!("bot : failed to retrieve sender");
+									}
+									
+								}
+								Err(e) => {
+									eprintln!("bot : Failed to get channels : {}", e);
+								}
+							
+							}
+						} else {
+							println!("bot : guild not found");
+						};						
+					}
+					Err(e) => {
+						eprintln!("bot : Failed to parse guild ID string to u64: {}", e);
+					}
+				}
+			}
+			_ => {
+				println!("bot : unhandled packet");
+			}
+		}
+	}
 }
+
 
 async fn get_guilds(context: &Context) {
 	let guilds = context.cache.guilds().await;
