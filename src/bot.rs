@@ -47,7 +47,6 @@ impl EventHandler for Handler {
 			} else {
 				"dm".to_string()
 			};
-			
 			let discord_message = discord_structure::Message::new(msg.id.to_string(), msg.channel_id.to_string(), guild_id, author_name, msg.content.clone(), msg.timestamp.to_rfc2822());
 			sender.send(postman::Packet::Message(discord_message)).expect("failed to send packet");
 		} else {
@@ -60,32 +59,32 @@ impl EventHandler for Handler {
 	}
 	
 	async fn cache_ready(&self, context: Context, _guilds: Vec<serenity::model::prelude::GuildId>) {
-	    println!("bot : cache built successfully!");
+		println!("bot : cache built successfully!");
 	
-	    let context = Arc::new(context);
+		let context = Arc::new(context);
 	
-	    if !self.is_loop_running.load(Ordering::Relaxed) {
-	        // We have to clone the Arc, as it gets moved into the new thread.
-	        let context1 = Arc::clone(&context);
-	        // tokio::spawn creates a new green thread that can run in parallel with the rest of
-	        // the application.
-	        tokio::spawn(async move {
-	            get_guilds(&context1).await;
-	        });
+		if !self.is_loop_running.load(Ordering::Relaxed) {
+			// We have to clone the Arc, as it gets moved into the new thread.
+			let context1 = Arc::clone(&context);
+			// tokio::spawn creates a new green thread that can run in parallel with the rest of
+			// the application.
+			tokio::spawn(async move {
+				get_guilds(&context1).await;
+			});
 	
-	        // Use tokio interval instead of spawning a loop
-	        let context2 = Arc::clone(&context);
-	        let mut interval = interval(Duration::from_millis(PACKET_REFRESH));
-	        tokio::spawn(async move {
-	            loop {
-	                interval.tick().await;
-	                check_packets(&context2).await;
-	            }
-	        });
+			// Use tokio interval instead of spawning a loop
+			let context2 = Arc::clone(&context);
+			let mut interval = interval(Duration::from_millis(PACKET_REFRESH));
+			tokio::spawn(async move {
+				loop {
+					interval.tick().await;
+					check_packets(&context2).await;
+				}
+			});
 	
-	        // Now that the loop is running, we set the bool to true
-	        self.is_loop_running.swap(true, Ordering::Relaxed);
-	    }
+			// Now that the loop is running, we set the bool to true
+			self.is_loop_running.swap(true, Ordering::Relaxed);
+		}
 	}
 }
 
@@ -103,39 +102,67 @@ async fn check_packets(context: &Context) {
 	} else {
 		println!("bot : failed to retrieve receiver");
 	}
-
-	for packet in packets_received {
-		match packet {
-			postman::Packet::FetchChannels(guild_id_str) => {
-				println!("bot : received FetchChannels packet, for guild '{}'", guild_id_str);
-				
-				match get_channels(context, guild_id_str).await {
-					Ok(_) => {
-						println!("bot : successfuly got channels");
+	
+	
+	if let Some(sender) = context.data.read().await.get::<postman::Sender>() {
+		for packet in packets_received {
+			match packet {
+				postman::Packet::FetchChannels(guild_id_str) => {
+					println!("bot : received FetchChannels packet, for guild '{}'", guild_id_str);
+					
+					match get_channels(context, guild_id_str).await {
+						Ok(_) => {
+							println!("bot : successfuly got channels");
+						}
+						Err(why) => {
+							println!("bot : error getting channels : {}", why);
+							sender.send(postman::Packet::Error(why)).expect("Failed to send packet");
+							sender.send(postman::Packet::FinishedRequest).expect("Failed to send packet");
+						}
 					}
-					Err(why) => {
-						println!("bot : error getting channels : {}", why);
+					
+				}
+				postman::Packet::FetchMessages(guild_id_str, channel_id_str, first_message_id_str) => {
+					println!("bot : received FetchMessages packet, channel : '{}', first message : {}", channel_id_str, first_message_id_str);
+					
+					match get_messages(context, guild_id_str.clone(), channel_id_str.clone(), first_message_id_str).await {
+						Ok(_) => {
+							println!("bot : successfuly got messages");
+						}
+						Err(why) => {
+							println!("bot : error getting messages : {}", why);
+							sender.send(postman::Packet::Error(why)).expect("Failed to send packet");
+							sender.send(postman::Packet::FinishedRequest).expect("Failed to send packet");
+						}
 					}
 				}
-				
-			}
-			postman::Packet::FetchMessages(guild_id_str, channel_id_str, first_message_id_str) => {
-				println!("bot : received FetchMessages packet, channel : '{}', first message : {}", channel_id_str, first_message_id_str);
-				
-				match get_messages(context, guild_id_str, channel_id_str, first_message_id_str).await {
-					Ok(_) => {
-						println!("bot : successfuly got messages");
+				postman::Packet::SendMessage(channel_id_str, content) => {
+					println!("bot : received SendMessage packet, channel : '{}', content : {}", channel_id_str, content);
+					
+					match send_message(context, channel_id_str, content).await {
+						Ok(_) => {
+							println!("bot : successfuly sent message");
+						}
+						Err(why) => {
+							println!("bot : error sending message : {}", why);
+							sender.send(postman::Packet::Error(why)).expect("Failed to send packet");
+							sender.send(postman::Packet::FinishedRequest).expect("Failed to send packet");
+						}
 					}
-					Err(why) => {
-						println!("bot : error getting messages : {}", why);
-					}
+					
 				}
-			}
-			_ => {
-				println!("bot : unhandled packet");
+				_ => {
+					println!("bot : unhandled packet");
+				}
 			}
 		}
 	}
+}
+
+async fn send_message(context: &Context, channel_id_str: String, content: String) -> Result<(), String> {
+	let channel_id_u64 = channel_id_str.parse::<u64>().map_err(|e| e.to_string())?;
+	ChannelId(channel_id_u64).say(&context.http, content).await.map_err(|e| e.to_string())?;
+	Ok(())
 }
 
 async fn get_channels(context: &Context, guild_id_str: String) -> Result<(), String> {
@@ -149,9 +176,9 @@ async fn get_channels(context: &Context, guild_id_str: String) -> Result<(), Str
 					continue
 				}
 				let discord_channel = discord_structure::Channel::new(channel.name, format!("{}",channel_id), guild_id_str.to_string());
-				sender.send(postman::Packet::Channel(discord_channel)).expect("Failed to send packet");
+				sender.send(postman::Packet::Channel(discord_channel)).map_err(|e| e.to_string())?;
 			}
-			sender.send(postman::Packet::FinishedRequest).expect("Failed to send packet");
+			sender.send(postman::Packet::FinishedRequest).map_err(|e| e.to_string())?;
 			
 		} else {
 			return Err("guild not found".to_string())

@@ -7,11 +7,12 @@ pub enum Packet {
 	Guild(discord_structure::Guild),
 	Channel(discord_structure::Channel),
 	Message(discord_structure::Message),
+	SendMessage(String, String),
 	ChannelEnd(String, String),
 	FetchChannels(String),
 	FetchMessages(String, String, String),
 	FinishedRequest,
-	
+	Error(String),
 }
 
 pub struct Sender;

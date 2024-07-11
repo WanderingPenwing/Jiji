@@ -146,11 +146,14 @@ impl eframe::App for Jiji {
 					}
 					
 				}
+				postman::Packet::Error(reason) => {
+					println!("gui : error received {}", reason);
+				}
 				postman::Packet::FinishedRequest => {
 					self.pending_bot_requests = self.pending_bot_requests.checked_sub(1).unwrap_or(0);
 				}
 				_ => {
-					println!("unhandled packet");
+					println!("gui : unhandled packet");
 				}
 			}
 		}
@@ -252,19 +255,22 @@ impl Jiji {
 		egui::TopBottomPanel::bottom("infobar")
 			.resizable(false)
 			.show(ctx, |ui| {
-				if self.selected_channel != None {
-					ui.label("");
-					ui.horizontal(|ui| {
-						if ui.button(">").clicked() {
-							println!("gui : sent message");
-						}
-						egui::ScrollArea::vertical()
-							.show(ui, |ui| {
-								let _response = ui.add(egui::TextEdit::multiline(&mut self.current_message)
-									.desired_width(f32::INFINITY)
-									.lock_focus(true));
-							});
-					});
+				if let Some(guild_index) = self.selected_guild {
+					if let Some(channel_index) = self.selected_channel {
+						ui.label("");
+						ui.horizontal(|ui| {
+							if ui.button(">").clicked() {
+								let _ = self.sender.send(postman::Packet::SendMessage(self.guilds[guild_index].channels[channel_index].id.clone(), self.current_message.clone()));
+								self.current_message = "".to_string();
+							}
+							egui::ScrollArea::vertical()
+								.show(ui, |ui| {
+									let _response = ui.add(egui::TextEdit::multiline(&mut self.current_message)
+										.desired_width(f32::INFINITY)
+										.lock_focus(true));
+								});
+						});
+					}
 				}
 				ui.horizontal(|ui| {
 					ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
