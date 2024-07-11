@@ -114,6 +114,7 @@ impl eframe::App for Jiji {
 						
 						if unkown_channel {
 							println!("gui : unkown channel");
+							self.guilds[guild_index].channels.push(discord_structure::Channel::new(message.channel_id.clone(), message.channel_id, message.guild_id));
 						}
 					}
 				}
@@ -192,7 +193,7 @@ impl Jiji {
 							for i in 0..self.guilds.len() {
 								if ui.add(egui::SelectableLabel::new(self.selected_guild == Some(i), self.guilds[i].name.clone())).clicked() {
 									self.selected_guild = Some(i);
-									if self.guilds[i].channels.len() == 0 {
+									if self.guilds[i].channels.len() == 0 && self.guilds[i].id != "dm" {
 										let _ = self.sender.send(postman::Packet::FetchChannels(self.guilds[i].id.clone()));
 										
 										self.selected_channel = None;

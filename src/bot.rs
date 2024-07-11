@@ -39,6 +39,21 @@ impl EventHandler for Handler {
 			println!("bot : successfuly sent reply");
 		}
 		
+		if let Some(sender) = context.data.read().await.get::<postman::Sender>() {
+			let author_name = msg.author.name.clone();
+			let mut guild_id = "dm".to_string();
+			
+			if let Some(channel) = msg.channel(&context.cache).await {
+				if let Some(guild) = channel.guild() {
+					guild_id = guild.id.to_string();
+				}
+			}
+			
+			let discord_message = discord_structure::Message::new(msg.id.to_string(), msg.channel_id.to_string(), guild_id, author_name, msg.content.clone(), msg.timestamp.to_rfc2822());
+			sender.send(postman::Packet::Message(discord_message)).expect("failed to send packet");
+		} else {
+			println!("bot : failed to retrieve sender");
+		}
 	}
 
 	async fn ready(&self, _context: Context, ready: Ready) {
@@ -59,6 +74,7 @@ impl EventHandler for Handler {
 				get_guilds(&context1).await;
 			});
 
+			//comment this to get the listening to messages working
 			let context2 = Arc::clone(&context);
 			tokio::spawn(async move {
 				loop {
@@ -184,6 +200,9 @@ async fn get_guilds(context: &Context) {
 	let guilds = context.cache.guilds().await;
 		
 	if let Some(sender) = context.data.read().await.get::<postman::Sender>() {
+		let personal_messages = discord_structure::Guild::new("dm".to_string(), "dm".to_string());
+		sender.send(postman::Packet::Guild(personal_messages)).expect("Failed to send packet");
+		
 		for guild_id in guilds {
 			if let Some(guild) = context.cache.guild(guild_id).await {
 				println!("bot : found guild '{}'", guild.name.clone());
