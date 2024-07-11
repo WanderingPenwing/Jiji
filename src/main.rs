@@ -9,6 +9,7 @@ mod postman;
 mod discord_structure;
 
 const MAX_FPS: f32 = 30.0;
+const RUNNING_REQUEST_REFRESH_DELAY: f32 = 0.2;
 
 fn main() {
 	let (bot_tx, gui_rx) = mpsc::channel::<postman::Packet>(); //tx transmiter
@@ -45,6 +46,8 @@ struct Jiji {
 	guilds: Vec<discord_structure::Guild>,
 	selected_guild: Option<usize>,
 	selected_channel: Option<usize>,
+	time_watch: f32,
+	pending_bot_requests: usize,
 }
 
 impl Jiji {
@@ -56,6 +59,8 @@ impl Jiji {
 			guilds: vec![],
 			selected_guild: None,
 			selected_channel: None,
+			time_watch: 0.0,
+			pending_bot_requests: 0,
 		}
 	}
 }
@@ -86,13 +91,27 @@ impl eframe::App for Jiji {
 				postman::Packet::Message(message) => {
 					println!("gui : message received : '{}'", message.content);
 				}
+				postman::Packet::FinishedRequest => {
+					self.pending_bot_requests = self.pending_bot_requests.checked_sub(1).unwrap_or(0);
+				}
 				_ => {
 					println!("unhandled packet");
 				}
 			}
 		}
+		
+		self.draw_selection(ctx);
+		
+		self.draw_infobar(ctx);
 
 		self.draw_feed(ctx);
+		
+		self.time_watch = self.next_frame.elapsed().as_micros() as f32 / 1000.0;
+		
+		if self.pending_bot_requests > 0 && !ctx.input(|i| i.wants_repaint()) {
+			thread::sleep(time::Duration::from_secs_f32(RUNNING_REQUEST_REFRESH_DELAY));
+			egui::Context::request_repaint(ctx);
+		}
 	}
 
 	fn on_exit(&mut self, _gl: std::option::Option<&eframe::glow::Context>) {
@@ -101,7 +120,7 @@ impl eframe::App for Jiji {
 }
 
 impl Jiji {
-	pub fn draw_feed(&mut self, ctx: &egui::Context) {
+	pub fn draw_selection(&mut self, ctx: &egui::Context) {
 		egui::TopBottomPanel::top("server_selection")
 			.resizable(false)
 			.show(ctx, |ui| {
@@ -126,6 +145,8 @@ impl Jiji {
 									self.selected_guild = Some(i);
 									if self.guilds[i].channels.len() == 0 {
 										let _ = self.sender.send(postman::Packet::FetchChannels(self.guilds[i].id.clone()));
+										
+										self.pending_bot_requests += 1;
 									}
 								}
 							}
@@ -155,6 +176,8 @@ impl Jiji {
 											if self.guilds[*selected_guild_index].channels[i].messages.len() == 0 {
 												let _ = self.sender.send(postman::Packet::FetchMessages(self.guilds[*selected_guild_index].id.clone(), self.guilds[*selected_guild_index].channels[i].id.clone()));
 												
+												self.pending_bot_requests += 1;
+												
 												self.guilds[*selected_guild_index].channels[i].greetings();
 											}
 										}
@@ -165,8 +188,30 @@ impl Jiji {
 					}
 				});
 			});
+		
+	}
+	
+	pub fn draw_infobar(&mut self, ctx: &egui::Context) {
+		egui::TopBottomPanel::bottom("infobar")
+			.resizable(false)
+			.show(ctx, |ui| {
+				ui.horizontal(|ui| {
+					ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+						ui.label(&format!("time per frame : {:.1} ms", self.time_watch));
+						
+						ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
+							if self.pending_bot_requests > 0 {
+								ui.label(&format!(" {} pending", self.pending_bot_requests));
+							}
+						});
+					});
+				});
+			});
+	}
+	
+	pub fn draw_feed(&mut self, ctx: &egui::Context) {
 		egui::CentralPanel::default().show(ctx, |ui| {
-			ui.label("General Kenobi");
+			ui.label("");
 		});
 	}
 }

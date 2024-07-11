@@ -103,6 +103,7 @@ async fn check_packets(context: &Context) {
 											sender.send(postman::Packet::Channel(discord_channel)).expect("Failed to send packet");
 										}
 										println!("bot : sent channels");
+										sender.send(postman::Packet::FinishedRequest).expect("Failed to send packet");
 									} else {
 										println!("bot : failed to retrieve sender");
 									}
@@ -124,6 +125,11 @@ async fn check_packets(context: &Context) {
 			}
 			postman::Packet::FetchMessages(guild_id_str, channel_id_str) => {
 				println!("bot : received FetchMessages packet, for guild '{}', channel : '{}'", guild_id_str, channel_id_str);
+				if let Some(sender) = context.data.read().await.get::<postman::Sender>() {
+					sender.send(postman::Packet::FinishedRequest).expect("Failed to send packet");
+				} else {
+					println!("bot : failed to retrieve sender");
+				}
 			}
 			_ => {
 				println!("bot : unhandled packet");
