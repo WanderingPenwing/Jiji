@@ -1,3 +1,5 @@
+use chrono::{DateTime, ParseError};
+
 #[derive(PartialEq, Clone)]
 pub struct Guild {
 	pub name: String,
@@ -34,8 +36,35 @@ impl Channel {
 	}
 	
 	pub fn insert(&mut self, message: Message) {
-		self.messages.insert(1, message);
-		println!("discord_structure : need to compare timestamp");
+		match self.get_index_from_timestamp(&message.timestamp) {
+			Ok(index) => {
+				self.messages.insert(index, message);
+			}
+			Err(why) => {
+				eprintln!("discord_structure : timestamp error : {}", why);
+				self.messages.push(message);
+			}
+		}
+		
+	}
+	
+	pub fn get_index_from_timestamp(&self, message_timestamp: &str) -> Result<usize, ParseError> {
+		let new_timestamp = DateTime::parse_from_rfc2822(message_timestamp)?;
+		
+		let mut index: usize = 0;
+				
+		for i in 0..self.messages.len() {
+			if self.messages[i].timestamp == "" {
+				index = i + 1;
+				continue
+			}
+			let current_timestamp = DateTime::parse_from_rfc2822(&self.messages[i].timestamp)?;
+			
+			if new_timestamp > current_timestamp {
+				index = i + 1;
+			}
+		}
+		Ok(index)
 	}
 	
 	pub fn end(&mut self) {

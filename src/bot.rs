@@ -29,15 +29,16 @@ struct Handler {
 
 #[async_trait]
 impl EventHandler for Handler {
-	async fn message(&self, ctx: Context, msg: Message) {
+	async fn message(&self, context: Context, msg: Message) {
 		println!("bot : message received : '{}' from {}", msg.content, msg.author);
 		if msg.content == HELP_COMMAND {
-			if let Err(why) = msg.channel_id.say(&ctx.http, HELP_MESSAGE).await {
+			if let Err(why) = msg.channel_id.say(&context.http, HELP_MESSAGE).await {
 				eprintln!("bot : Error sending message: {:?}", why);
 				return
 			}
 			println!("bot : successfuly sent reply");
 		}
+		
 	}
 
 	async fn ready(&self, _context: Context, ready: Ready) {
@@ -140,7 +141,7 @@ async fn get_channels(context: &Context, guild_id_str: String) -> Result<(), Str
 			return Err("guild not found".to_string())
 		}
 	} else {
-		return Err("failed to retriev sender".to_string())
+		return Err("failed to retrieve sender".to_string())
 	}
 	Ok(())				
 }
@@ -163,7 +164,7 @@ async fn get_messages(context: &Context, guild_id_str: String, channel_id_str: S
 				
 		for message in &messages {
 			let author_name = message.author.name.clone();
-			let discord_message = discord_structure::Message::new(message.id.to_string(), channel_id_str.clone(), guild_id_str.clone(), author_name, message.content.clone(), message.timestamp.to_string());
+			let discord_message = discord_structure::Message::new(message.id.to_string(), channel_id_str.clone(), guild_id_str.clone(), author_name, message.content.clone(), message.timestamp.to_rfc2822());
 			sender.send(postman::Packet::Message(discord_message)).map_err(|e| e.to_string())?;
 		}
 		
