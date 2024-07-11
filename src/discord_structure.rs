@@ -15,6 +15,21 @@ impl Guild {
 			channels: vec![],
 		}
 	}
+	
+	pub fn add_channel(&mut self, channel: Channel) {
+		let mut already_exist = false;
+		
+		for existing_channel in self.channels.clone() {
+			if existing_channel.id != channel.id {
+				continue
+			}
+			already_exist = true;
+		}
+		
+		if !already_exist {
+			self.channels.insert(0, channel.clone())
+		}
+	}
 }
 
 #[derive(PartialEq, Clone)]

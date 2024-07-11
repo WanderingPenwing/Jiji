@@ -86,8 +86,7 @@ impl eframe::App for Jiji {
 						if self.guilds[i].id != channel.guild_id {
 							continue
 						}
-						self.guilds[i].channels.push(channel.clone());
-						println!("gui : channel added to '{}'", self.guilds[i].name);
+						self.guilds[i].add_channel(channel.clone());
 					}
 				}
 				postman::Packet::Message(message) => {

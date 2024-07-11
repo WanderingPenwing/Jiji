@@ -45,6 +45,8 @@ impl EventHandler for Handler {
 			let guild_id = if let Some(id) = msg.guild_id {
 				id.to_string()
 			} else {
+				let private_channel = discord_structure::Channel::new(author_name.clone(), msg.channel_id.to_string(), "dm".to_string());
+				sender.send(postman::Packet::Channel(private_channel)).expect("failed to send packet");
 				"dm".to_string()
 			};
 			let discord_message = discord_structure::Message::new(msg.id.to_string(), msg.channel_id.to_string(), guild_id, author_name, msg.content.clone(), msg.timestamp.to_rfc2822());
