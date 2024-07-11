@@ -103,17 +103,41 @@ impl eframe::App for Jiji {
 					}
 					
 					if let Some(guild_index) = guild {
+						let mut unkown_channel = true;
 						for i in 0..self.guilds[guild_index].channels.len() {
 							if self.guilds[guild_index].channels[i].id != message.channel_id {
 								continue
 							}
-							if self.guilds[guild_index].channels[i].messages[0].author_name == "+" {
-									self.guilds[guild_index].channels[i].messages[0] = message.clone();
-								continue
-							}
-							self.guilds[guild_index].channels[i].messages.insert(0, message.clone());
+							self.guilds[guild_index].channels[i].insert(message.clone());
+							unkown_channel = false;
+						}
+						
+						if unkown_channel {
+							println!("gui : unkown channel");
 						}
 					}
+				}
+				postman::Packet::ChannelEnd(guild_id, channel_id) => {
+					println!("gui : end of channel : '{}'", channel_id);
+					
+					let mut guild: Option<usize> = None;
+					
+					for i in 0..self.guilds.len() {
+						if self.guilds[i].id != guild_id {
+							continue
+						}
+						guild = Some(i);
+					}
+					
+					if let Some(guild_index) = guild {
+						for i in 0..self.guilds[guild_index].channels.len() {
+							if self.guilds[guild_index].channels[i].id != channel_id {
+								continue
+							}
+							self.guilds[guild_index].channels[i].end();
+						}
+					}
+					
 				}
 				postman::Packet::FinishedRequest => {
 					self.pending_bot_requests = self.pending_bot_requests.checked_sub(1).unwrap_or(0);
@@ -199,12 +223,10 @@ impl Jiji {
 									for i in 0..self.guilds[*selected_guild_index].channels.len() {
 										if ui.add(egui::SelectableLabel::new(self.selected_channel == Some(i), self.guilds[*selected_guild_index].channels[i].name.clone())).clicked() {
 											self.selected_channel = Some(i);
-											if self.guilds[*selected_guild_index].channels[i].messages.len() == 0 {
+											if self.guilds[*selected_guild_index].channels[i].messages.len() == 1 {
 												let _ = self.sender.send(postman::Packet::FetchMessages(self.guilds[*selected_guild_index].id.clone(), self.guilds[*selected_guild_index].channels[i].id.clone(), "".into()));
 												
 												self.pending_bot_requests += 1;
-												
-												self.guilds[*selected_guild_index].channels[i].greetings();
 											}
 										}
 									}
@@ -257,11 +279,10 @@ impl Jiji {
 				if let Some(selected_guild_index) = &self.selected_guild {
 					if let Some(selected_channel_index) = &self.selected_channel {
 						let mut last_author = "".to_string();
-						for message in &self.guilds[*selected_guild_index].channels[*selected_channel_index].messages {
-							if message.author_name == "-" {
-								continue
-							}
-							
+						if self.guilds[*selected_guild_index].channels[*selected_channel_index].messages.len() < 2 {
+							return
+						}
+						for message in &self.guilds[*selected_guild_index].channels[*selected_channel_index].messages {							
 							if message.author_name == "+" {
 								if ui.button("+").clicked() {
 									if let Some(selected_guild_index) = &self.selected_guild {

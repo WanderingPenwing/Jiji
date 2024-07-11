@@ -7,6 +7,7 @@ pub enum Packet {
 	Guild(discord_structure::Guild),
 	Channel(discord_structure::Channel),
 	Message(discord_structure::Message),
+	ChannelEnd(String, String),
 	FetchChannels(String),
 	FetchMessages(String, String, String),
 	FinishedRequest,

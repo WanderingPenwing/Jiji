@@ -167,9 +167,8 @@ async fn get_messages(context: &Context, guild_id_str: String, channel_id_str: S
 			sender.send(postman::Packet::Message(discord_message)).map_err(|e| e.to_string())?;
 		}
 		
-		if messages.len() == 25 {
-			let discord_fetch_message = discord_structure::Message::new("".to_string(), channel_id_str.clone(), guild_id_str.clone(), "+".to_string(), "".to_string(), "".to_string());
-			sender.send(postman::Packet::Message(discord_fetch_message)).map_err(|e| e.to_string())?;
+		if messages.len() < 25 {
+			sender.send(postman::Packet::ChannelEnd(guild_id_str.clone(), channel_id_str.clone())).map_err(|e| e.to_string())?;
 		}
 		
 		sender.send(postman::Packet::FinishedRequest).map_err(|e| e.to_string())?;

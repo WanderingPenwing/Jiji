@@ -27,14 +27,22 @@ impl Channel {
 	pub fn new(name: String, id: String, guild_id: String) -> Self {
 		Self {
 			name,
-			id,
-			guild_id,
-			messages: vec![],
+			id: id.clone(),
+			guild_id : guild_id.clone(),
+			messages: vec![Message::new("0".into(), id, guild_id, "+".into(), "".into(), "".into())],
 		}
 	}
 	
-	pub fn greetings(&mut self) {
-		self.messages.push(Message::new("0".into(), self.id.clone(), self.guild_id.clone(), "-".into(), "start of the conversation".into(), "".into()));
+	pub fn insert(&mut self, message: Message) {
+		self.messages.insert(1, message);
+		println!("discord_structure : need to compare timestamp");
+	}
+	
+	pub fn end(&mut self) {
+		if self.messages[0].author_name != "+" {
+			return
+		}
+		self.messages.remove(0);
 	}
 }
 
