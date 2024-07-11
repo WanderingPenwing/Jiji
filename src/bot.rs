@@ -4,6 +4,8 @@ use serenity::{
 	prelude::*,
 };
 use serenity::model::prelude::ChannelType;
+use serenity::model::id::ChannelId;
+use serenity::model::id::MessageId;
 use std::sync::mpsc;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -31,7 +33,7 @@ impl EventHandler for Handler {
 		println!("bot : message received : '{}' from {}", msg.content, msg.author);
 		if msg.content == HELP_COMMAND {
 			if let Err(why) = msg.channel_id.say(&ctx.http, HELP_MESSAGE).await {
-				println!("bot : Error sending message: {:?}", why);
+				eprintln!("bot : Error sending message: {:?}", why);
 				return
 			}
 			println!("bot : successfuly sent reply");
@@ -109,8 +111,8 @@ async fn check_packets(context: &Context) {
 									}
 									
 								}
-								Err(e) => {
-									eprintln!("bot : Failed to get channels : {}", e);
+								Err(why) => {
+									eprintln!("bot : Failed to get channels : {}", why);
 								}
 							
 							}
@@ -118,14 +120,43 @@ async fn check_packets(context: &Context) {
 							println!("bot : guild not found");
 						};						
 					}
-					Err(e) => {
-						eprintln!("bot : Failed to parse guild ID string to u64: {}", e);
+					Err(why) => {
+						eprintln!("bot : Failed to parse guild ID string to u64: {}", why);
 					}
 				}
 			}
-			postman::Packet::FetchMessages(guild_id_str, channel_id_str) => {
-				println!("bot : received FetchMessages packet, for guild '{}', channel : '{}'", guild_id_str, channel_id_str);
+			postman::Packet::FetchMessages(guild_id_str, channel_id_str, first_message_id_str) => {
+				println!("bot : received FetchMessages packet, channel : '{}', first message : {}", channel_id_str, first_message_id_str);
 				if let Some(sender) = context.data.read().await.get::<postman::Sender>() {
+					match channel_id_str.parse::<u64>() {
+						Ok(channel_id_u64) => {
+							let channel_id = ChannelId::from(channel_id_u64);
+
+							let maybe_messages = channel_id.messages(&context.http, |retriever| {
+						        retriever.after(MessageId::from(158339864557912064)).limit(25)
+						    }).await;
+							
+							match maybe_messages {
+								Ok(messages) => {
+									println!("bot : got messages");
+									
+									for message in messages {
+										let discord_message = discord_structure::Message::new(message.id.to_string(), channel_id_str.clone(), guild_id_str.clone(), message.author.to_string(), message.content, message.timestamp.to_string());
+										sender.send(postman::Packet::Message(discord_message)).expect("Failed to send packet");
+									}
+								}
+								Err(why) => {
+									eprintln!("bot : Failed to fetch messages : {}", why);
+								}
+							
+							}
+						}
+						Err(why) => {
+							eprintln!("bot : Failed to parse channel ID string to u64: {}", why);
+						}
+					}
+					
+					
 					sender.send(postman::Packet::FinishedRequest).expect("Failed to send packet");
 				} else {
 					println!("bot : failed to retrieve sender");

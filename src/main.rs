@@ -80,7 +80,7 @@ impl eframe::App for Jiji {
 				}
 				postman::Packet::Channel(channel) => {
 					println!("gui : channel received : '{}'", channel.name);
-					 for i in 0..self.guilds.len() {
+					for i in 0..self.guilds.len() {
 						if self.guilds[i].id != channel.guild_id {
 							continue
 						}
@@ -90,6 +90,24 @@ impl eframe::App for Jiji {
 				}
 				postman::Packet::Message(message) => {
 					println!("gui : message received : '{}'", message.content);
+					
+					let mut guild: Option<usize> = None;
+					
+					for i in 0..self.guilds.len() {
+						if self.guilds[i].id != message.guild_id {
+							continue
+						}
+						guild = Some(i);
+					}
+					
+					if let Some(guild_index) = guild {
+						for i in 0..self.guilds[guild_index].channels.len() {
+							if self.guilds[guild_index].channels[i].id != message.channel_id {
+								continue
+							}
+							self.guilds[guild_index].channels[i].messages.insert(0, message.clone());
+						}
+					}
 				}
 				postman::Packet::FinishedRequest => {
 					self.pending_bot_requests = self.pending_bot_requests.checked_sub(1).unwrap_or(0);
@@ -174,7 +192,7 @@ impl Jiji {
 										if ui.add(egui::SelectableLabel::new(self.selected_channel == Some(i), self.guilds[*selected_guild_index].channels[i].name.clone())).clicked() {
 											self.selected_channel = Some(i);
 											if self.guilds[*selected_guild_index].channels[i].messages.len() == 0 {
-												let _ = self.sender.send(postman::Packet::FetchMessages(self.guilds[*selected_guild_index].id.clone(), self.guilds[*selected_guild_index].channels[i].id.clone()));
+												let _ = self.sender.send(postman::Packet::FetchMessages(self.guilds[*selected_guild_index].id.clone(), self.guilds[*selected_guild_index].channels[i].id.clone(), "".into()));
 												
 												self.pending_bot_requests += 1;
 												
@@ -211,7 +229,22 @@ impl Jiji {
 	
 	pub fn draw_feed(&mut self, ctx: &egui::Context) {
 		egui::CentralPanel::default().show(ctx, |ui| {
-			ui.label("");
+			egui::ScrollArea::vertical()
+					.stick_to_bottom(true)
+					.show(ui, |ui| {
+				if let Some(selected_guild_index) = &self.selected_guild {
+					if let Some(selected_channel_index) = &self.selected_channel {
+						for message in &self.guilds[*selected_guild_index].channels[*selected_channel_index].messages {
+							if message.author_name == "-" {
+								continue
+							}
+							ui.separator();
+							ui.label(&message.content);
+							ui.label(&message.author_name);
+						}
+					}
+				}
+			});
 		});
 	}
 }

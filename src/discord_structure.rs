@@ -34,27 +34,29 @@ impl Channel {
 	}
 	
 	pub fn greetings(&mut self) {
-		self.messages.push(Message::new("-".into(), "0".into(), self.id.clone(), self.guild_id.clone(), "start of the conversation".into()));
+		self.messages.push(Message::new("0".into(), self.id.clone(), self.guild_id.clone(), "-".into(), "start of the conversation".into(), "".into()));
 	}
 }
 
 #[derive(PartialEq, Clone)]
 pub struct Message {
-	pub author_name: String,
 	pub id: String,
 	pub channel_id: String,
 	pub guild_id: String,
+	pub author_name: String,
 	pub content: String,
+	pub timestamp: String,
 }
 
 impl Message {
-	pub fn new(author_name: String, id: String, channel_id: String, guild_id: String, content: String) -> Self {
+	pub fn new(id: String, channel_id: String, guild_id: String, author_name: String, content: String, timestamp: String) -> Self {
 		Self {
-			author_name,
 			id,
 			channel_id,
 			guild_id,
+			author_name,
 			content,
+			timestamp,
 		}
 	}
 }

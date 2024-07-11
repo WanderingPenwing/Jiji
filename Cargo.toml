@@ -9,5 +9,5 @@ edition = "2021"
 eframe = "0.26.2"
 futures = "0.3.30"
 image = "0.24.9"
-serenity = { default-features = false, features = ["client", "gateway", "model", "rustls_backend", "cache", "http"], version = "0.9.0-rc.2"}
+serenity = { version = "0.9.0-rc.2", default-features = false, features = ["client", "gateway", "model", "builder", "rustls_backend", "cache", "http"] }
 tokio = {features =  ["macros"], version = "0.2"}
