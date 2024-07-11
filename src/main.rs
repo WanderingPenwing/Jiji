@@ -48,6 +48,7 @@ struct Jiji {
 	selected_channel: Option<usize>,
 	time_watch: f32,
 	pending_bot_requests: usize,
+	current_message: String,
 }
 
 impl Jiji {
@@ -61,6 +62,7 @@ impl Jiji {
 			selected_channel: None,
 			time_watch: 0.0,
 			pending_bot_requests: 0,
+			current_message: "".into(),
 		}
 	}
 }
@@ -103,6 +105,10 @@ impl eframe::App for Jiji {
 					if let Some(guild_index) = guild {
 						for i in 0..self.guilds[guild_index].channels.len() {
 							if self.guilds[guild_index].channels[i].id != message.channel_id {
+								continue
+							}
+							if self.guilds[guild_index].channels[i].messages[0].author_name == "+" {
+									self.guilds[guild_index].channels[i].messages[0] = message.clone();
 								continue
 							}
 							self.guilds[guild_index].channels[i].messages.insert(0, message.clone());
@@ -157,6 +163,7 @@ impl Jiji {
 							ui.set_min_width(60.0);
 							if ui.add(egui::SelectableLabel::new(self.selected_guild == None, "None")).clicked() {
 								self.selected_guild = None;
+								self.selected_channel = None;
 							}
 							for i in 0..self.guilds.len() {
 								if ui.add(egui::SelectableLabel::new(self.selected_guild == Some(i), self.guilds[i].name.clone())).clicked() {
@@ -164,6 +171,7 @@ impl Jiji {
 									if self.guilds[i].channels.len() == 0 {
 										let _ = self.sender.send(postman::Packet::FetchChannels(self.guilds[i].id.clone()));
 										
+										self.selected_channel = None;
 										self.pending_bot_requests += 1;
 									}
 								}
@@ -213,6 +221,20 @@ impl Jiji {
 		egui::TopBottomPanel::bottom("infobar")
 			.resizable(false)
 			.show(ctx, |ui| {
+				if self.selected_channel != None {
+					ui.label("");
+					ui.horizontal(|ui| {
+						if ui.button(">").clicked() {
+							println!("gui : sent message");
+						}
+						egui::ScrollArea::vertical()
+							.show(ui, |ui| {
+								let _response = ui.add(egui::TextEdit::multiline(&mut self.current_message)
+									.desired_width(f32::INFINITY)
+									.lock_focus(true));
+							});
+					});
+				}
 				ui.horizontal(|ui| {
 					ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
 						ui.label(&format!("time per frame : {:.1} ms", self.time_watch));
@@ -234,13 +256,35 @@ impl Jiji {
 					.show(ui, |ui| {
 				if let Some(selected_guild_index) = &self.selected_guild {
 					if let Some(selected_channel_index) = &self.selected_channel {
+						let mut last_author = "".to_string();
 						for message in &self.guilds[*selected_guild_index].channels[*selected_channel_index].messages {
 							if message.author_name == "-" {
 								continue
 							}
-							ui.separator();
+							
+							if message.author_name == "+" {
+								if ui.button("+").clicked() {
+									if let Some(selected_guild_index) = &self.selected_guild {
+										if let Some(selected_channel_index) = &self.selected_channel {
+											let _ = self.sender.send(postman::Packet::FetchMessages(
+												self.guilds[*selected_guild_index].id.clone(), 
+												self.guilds[*selected_guild_index].channels[*selected_channel_index].id.clone(), 
+												self.guilds[*selected_guild_index].channels[*selected_channel_index].messages[1].id.clone(),
+											));
+											self.pending_bot_requests += 1;
+										}
+									}
+								}
+								continue
+							}
+							if message.author_name != last_author {
+								ui.separator();
+								ui.colored_label(hex_str_to_color("#3399ff"), &message.author_name);
+							} else {
+								ui.label("");
+							}
 							ui.label(&message.content);
-							ui.label(&message.author_name);
+							last_author = message.author_name.clone();
 						}
 					}
 				}
@@ -263,4 +307,8 @@ pub fn load_icon() -> Result<egui::IconData, Box<dyn Error>> {
 		width: icon_width,
 		height: icon_height,
 	})
+}
+
+pub fn hex_str_to_color(hex_str: &str) -> egui::Color32 {
+	egui::Color32::from_hex(hex_str).unwrap_or_else(|_| egui::Color32::WHITE)
 }

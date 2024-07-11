@@ -127,46 +127,48 @@ async fn check_packets(context: &Context) {
 			}
 			postman::Packet::FetchMessages(guild_id_str, channel_id_str, first_message_id_str) => {
 				println!("bot : received FetchMessages packet, channel : '{}', first message : {}", channel_id_str, first_message_id_str);
-				if let Some(sender) = context.data.read().await.get::<postman::Sender>() {
-					match channel_id_str.parse::<u64>() {
-						Ok(channel_id_u64) => {
-							let channel_id = ChannelId::from(channel_id_u64);
-
-							let maybe_messages = channel_id.messages(&context.http, |retriever| {
-						        retriever.after(MessageId::from(158339864557912064)).limit(25)
-						    }).await;
-							
-							match maybe_messages {
-								Ok(messages) => {
-									println!("bot : got messages");
-									
-									for message in messages {
-										let discord_message = discord_structure::Message::new(message.id.to_string(), channel_id_str.clone(), guild_id_str.clone(), message.author.to_string(), message.content, message.timestamp.to_string());
-										sender.send(postman::Packet::Message(discord_message)).expect("Failed to send packet");
-									}
-								}
-								Err(why) => {
-									eprintln!("bot : Failed to fetch messages : {}", why);
-								}
-							
-							}
-						}
-						Err(why) => {
-							eprintln!("bot : Failed to parse channel ID string to u64: {}", why);
-						}
-					}
-					
-					
-					sender.send(postman::Packet::FinishedRequest).expect("Failed to send packet");
-				} else {
-					println!("bot : failed to retrieve sender");
-				}
+				
+				let _result = get_messages(context, guild_id_str, channel_id_str, first_message_id_str).await;
 			}
 			_ => {
 				println!("bot : unhandled packet");
 			}
 		}
 	}
+}
+
+async fn get_messages(context: &Context, guild_id_str: String, channel_id_str: String, first_message_id_str: String) -> Result<(), String> {
+	if let Some(sender) = context.data.read().await.get::<postman::Sender>() {
+		let channel_id_u64 = channel_id_str.parse::<u64>().map_err(|e| e.to_string())?;
+		let channel_id = ChannelId::from(channel_id_u64);
+
+		let messages = if first_message_id_str == "" {
+			channel_id.messages(&context.http, |retriever| {
+				retriever.limit(25)
+			}).await.map_err(|e| e.to_string())?
+		} else {
+			let first_message_id_u64 = first_message_id_str.parse::<u64>().map_err(|e| e.to_string())?; 
+			channel_id.messages(&context.http, |retriever| {
+				retriever.before(MessageId::from(first_message_id_u64)).limit(25)
+			}).await.map_err(|e| e.to_string())?
+		};
+		
+		println!("bot : got messages");
+				
+		for message in &messages {
+			let author_name = message.author.name.clone();
+			let discord_message = discord_structure::Message::new(message.id.to_string(), channel_id_str.clone(), guild_id_str.clone(), author_name, message.content.clone(), message.timestamp.to_string());
+			sender.send(postman::Packet::Message(discord_message)).map_err(|e| e.to_string())?;
+		}
+		
+		if messages.len() == 25 {
+			let discord_fetch_message = discord_structure::Message::new("".to_string(), channel_id_str.clone(), guild_id_str.clone(), "+".to_string(), "".to_string(), "".to_string());
+			sender.send(postman::Packet::Message(discord_fetch_message)).map_err(|e| e.to_string())?;
+		}
+		
+		sender.send(postman::Packet::FinishedRequest).map_err(|e| e.to_string())?;
+	}
+	Ok(())
 }
 
 
