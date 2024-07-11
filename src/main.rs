@@ -102,6 +102,7 @@ impl eframe::App for Jiji {
 						guild = Some(i);
 					}
 					
+					
 					if let Some(guild_index) = guild {
 						let mut unkown_channel = true;
 						for i in 0..self.guilds[guild_index].channels.len() {
@@ -110,12 +111,17 @@ impl eframe::App for Jiji {
 							}
 							self.guilds[guild_index].channels[i].insert(message.clone());
 							unkown_channel = false;
+							println!("gui : message put in : '{}'", self.guilds[guild_index].channels[i].name);
 						}
 						
 						if unkown_channel {
 							println!("gui : unkown channel");
 							self.guilds[guild_index].channels.push(discord_structure::Channel::new(message.channel_id.clone(), message.channel_id, message.guild_id));
 						}
+					} else {
+						println!("gui : message guild issue : '{}'", message.guild_id);
+						
+						println!("gui : guilds {:?}", self.guilds.clone().into_iter().map(|guild| { guild.id.clone()}).collect::<Vec<String>>());
 					}
 				}
 				postman::Packet::ChannelEnd(guild_id, channel_id) => {
@@ -193,12 +199,14 @@ impl Jiji {
 							for i in 0..self.guilds.len() {
 								if ui.add(egui::SelectableLabel::new(self.selected_guild == Some(i), self.guilds[i].name.clone())).clicked() {
 									self.selected_guild = Some(i);
+									self.selected_channel = None;
+									
 									if self.guilds[i].channels.len() == 0 && self.guilds[i].id != "dm" {
 										let _ = self.sender.send(postman::Packet::FetchChannels(self.guilds[i].id.clone()));
 										
-										self.selected_channel = None;
 										self.pending_bot_requests += 1;
 									}
+									
 								}
 							}
 						});

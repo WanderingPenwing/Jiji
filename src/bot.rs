@@ -10,8 +10,9 @@ use std::sync::mpsc;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
-use std::thread;
 use std::sync::Arc;
+use tokio::time::interval;
+
 
 use crate::postman;
 use crate::discord_structure;
@@ -41,13 +42,11 @@ impl EventHandler for Handler {
 		
 		if let Some(sender) = context.data.read().await.get::<postman::Sender>() {
 			let author_name = msg.author.name.clone();
-			let mut guild_id = "dm".to_string();
-			
-			if let Some(channel) = msg.channel(&context.cache).await {
-				if let Some(guild) = channel.guild() {
-					guild_id = guild.id.to_string();
-				}
-			}
+			let guild_id = if let Some(id) = msg.guild_id {
+				id.to_string()
+			} else {
+				"dm".to_string()
+			};
 			
 			let discord_message = discord_structure::Message::new(msg.id.to_string(), msg.channel_id.to_string(), guild_id, author_name, msg.content.clone(), msg.timestamp.to_rfc2822());
 			sender.send(postman::Packet::Message(discord_message)).expect("failed to send packet");
@@ -61,31 +60,32 @@ impl EventHandler for Handler {
 	}
 	
 	async fn cache_ready(&self, context: Context, _guilds: Vec<serenity::model::prelude::GuildId>) {
-		println!("bot : cache built successfully!");
-		
-		let context = Arc::new(context);
-		
-		if !self.is_loop_running.load(Ordering::Relaxed) {
-			// We have to clone the Arc, as it gets moved into the new thread.
-			let context1 = Arc::clone(&context);
-			// tokio::spawn creates a new green thread that can run in parallel with the rest of
-			// the application.
-			tokio::spawn(async move {
-				get_guilds(&context1).await;
-			});
-
-			//comment this to get the listening to messages working
-			let context2 = Arc::clone(&context);
-			tokio::spawn(async move {
-				loop {
-					check_packets(&context2).await;
-					thread::sleep(Duration::from_millis(PACKET_REFRESH));
-				}
-			});
-
-			// Now that the loop is running, we set the bool to true
-			self.is_loop_running.swap(true, Ordering::Relaxed);
-		}
+	    println!("bot : cache built successfully!");
+	
+	    let context = Arc::new(context);
+	
+	    if !self.is_loop_running.load(Ordering::Relaxed) {
+	        // We have to clone the Arc, as it gets moved into the new thread.
+	        let context1 = Arc::clone(&context);
+	        // tokio::spawn creates a new green thread that can run in parallel with the rest of
+	        // the application.
+	        tokio::spawn(async move {
+	            get_guilds(&context1).await;
+	        });
+	
+	        // Use tokio interval instead of spawning a loop
+	        let context2 = Arc::clone(&context);
+	        let mut interval = interval(Duration::from_millis(PACKET_REFRESH));
+	        tokio::spawn(async move {
+	            loop {
+	                interval.tick().await;
+	                check_packets(&context2).await;
+	            }
+	        });
+	
+	        // Now that the loop is running, we set the bool to true
+	        self.is_loop_running.swap(true, Ordering::Relaxed);
+	    }
 	}
 }
 
