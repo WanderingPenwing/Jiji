@@ -32,6 +32,10 @@ impl Channel {
 			messages: vec![],
 		}
 	}
+	
+	pub fn greetings(&mut self) {
+		self.messages.push(Message::new("-".into(), "0".into(), self.id.clone(), self.guild_id.clone(), "start of the conversation".into()));
+	}
 }
 
 #[derive(PartialEq, Clone)]

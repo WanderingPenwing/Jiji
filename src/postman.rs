@@ -5,9 +5,10 @@ use std::sync::Mutex;
 
 pub enum Packet {
 	Guild(discord_structure::Guild),
-	FetchChannels(String),
 	Channel(discord_structure::Channel),
 	Message(discord_structure::Message),
+	FetchChannels(String),
+	FetchMessages(String, String)
 }
 
 pub struct Sender;

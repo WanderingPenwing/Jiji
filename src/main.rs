@@ -124,18 +124,17 @@ impl Jiji {
 							for i in 0..self.guilds.len() {
 								if ui.add(egui::SelectableLabel::new(self.selected_guild == Some(i), self.guilds[i].name.clone())).clicked() {
 									self.selected_guild = Some(i);
+									if self.guilds[i].channels.len() == 0 {
+										let _ = self.sender.send(postman::Packet::FetchChannels(self.guilds[i].id.clone()));
+									}
 								}
 							}
 						});
 						
 					
+					//let _ = self.sender.send(postman::Packet::FetchChannels(self.guilds[*selected_guild_index].id.clone()));
 					if let Some(selected_guild_index) = &self.selected_guild {
-						if self.guilds[*selected_guild_index].channels.len() == 0 {
-							if ui.add(egui::Button::new("get channels")).clicked() {
-								let _ = self.sender.send(postman::Packet::FetchChannels(self.guilds[*selected_guild_index].id.clone()));
-							}
-						} else {
-						
+						if self.guilds[*selected_guild_index].channels.len() != 0 {
 							let selected_channel_text = if let Some(selected_channel_index) = &self.selected_channel {
 								self.guilds[*selected_guild_index].channels[*selected_channel_index].name.clone()
 							} else {
@@ -153,6 +152,11 @@ impl Jiji {
 									for i in 0..self.guilds[*selected_guild_index].channels.len() {
 										if ui.add(egui::SelectableLabel::new(self.selected_channel == Some(i), self.guilds[*selected_guild_index].channels[i].name.clone())).clicked() {
 											self.selected_channel = Some(i);
+											if self.guilds[*selected_guild_index].channels[i].messages.len() == 0 {
+												let _ = self.sender.send(postman::Packet::FetchMessages(self.guilds[*selected_guild_index].id.clone(), self.guilds[*selected_guild_index].channels[i].id.clone()));
+												
+												self.guilds[*selected_guild_index].channels[i].greetings();
+											}
 										}
 									}
 								});
