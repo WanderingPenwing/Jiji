@@ -1,12 +1,15 @@
 use eframe::egui;
-use image::GenericImageView;
-use std::{error::Error, sync::Arc, sync::mpsc, thread, time};
+use std::{sync::Arc, sync::mpsc, thread, time};
 use tokio::runtime::Runtime;
 use std::sync::Mutex;
+use std::path::PathBuf;
+use std::collections::HashMap;
+use homedir::get_my_home;
 
 mod bot;
 mod postman;
 mod discord_structure;
+mod state;
 
 const MAX_FPS: f32 = 30.0;
 const RUNNING_REQUEST_REFRESH_DELAY: f32 = 0.2;
@@ -27,7 +30,7 @@ fn main() {
 }
 
 fn gui(sender: mpsc::Sender<postman::Packet>, receiver: mpsc::Receiver<postman::Packet>) {
-	let icon_data = load_icon().unwrap_or_default();
+	let icon_data = state::load_icon().unwrap_or_default();
 
 	let options = eframe::NativeOptions {
 		viewport: egui::ViewportBuilder::default()
@@ -43,6 +46,7 @@ struct Jiji {
 	next_frame: time::Instant,
 	sender: mpsc::Sender<postman::Packet>,
 	receiver: mpsc::Receiver<postman::Packet>,
+	bot_token: String,
 	guilds: Vec<discord_structure::Guild>,
 	selected_guild: Option<usize>,
 	selected_channel: Option<usize>,
@@ -54,17 +58,20 @@ struct Jiji {
 
 impl Jiji {
 	fn new(sender: mpsc::Sender<postman::Packet>, receiver: mpsc::Receiver<postman::Packet>) -> Self {
+		let app_state = state::load_state(&save_path());
+		
 		Self {
 			next_frame: time::Instant::now(),
 			sender,
 			receiver,
+			bot_token: app_state.bot_token.clone(),
 			guilds: vec![],
 			selected_guild: None,
 			selected_channel: None,
 			time_watch: 0.0,
 			pending_bot_requests: 0,
 			current_message: "".into(),
-			channels_to_notify: vec![],
+			channels_to_notify: app_state.channels_to_notify.clone(),
 		}
 	}
 }
@@ -88,7 +95,17 @@ impl eframe::App for Jiji {
 						if self.guilds[i].id != channel.guild_id {
 							continue
 						}
-						self.guilds[i].add_channel(channel.clone());
+						
+						let mut discord_channel = channel.clone(); // finish if with variable clone of channel to update with notify
+						
+						if let Some(index) = self.channels_to_notify.iter().position(|x| x == &channel.id) {
+							discord_channel.notify = true;
+							self.channels_to_notify.remove(index);
+						}
+						
+						self.guilds[i].add_channel(discord_channel.clone());
+						
+							
 					}
 				}
 				postman::Packet::Message(message) => {
@@ -176,7 +193,7 @@ impl eframe::App for Jiji {
 	}
 
 	fn on_exit(&mut self, _gl: std::option::Option<&eframe::glow::Context>) {
-		//self.runtime.shutdown_background();
+		self.save_state();
 	}
 }
 
@@ -337,24 +354,39 @@ impl Jiji {
 			});
 		});
 	}
-}
-
-pub fn load_icon() -> Result<egui::IconData, Box<dyn Error>> {
-	let (icon_rgba, icon_width, icon_height) = {
-		let icon = include_bytes!("../assets/icon.png");
-		let image = image::load_from_memory(icon)?;
-		let rgba = image.clone().into_rgba8().to_vec();
-		let (width, height) = image.dimensions();
-		(rgba, width, height)
-	};
-
-	Ok(egui::IconData {
-		rgba: icon_rgba,
-		width: icon_width,
-		height: icon_height,
-	})
+	
+	pub fn save_state(&self) {
+		let mut channels_to_notify = self.channels_to_notify.clone();
+		
+		for g in 0..self.guilds.len() {
+			for c in 0..self.guilds[g].channels.len() {
+				if !self.guilds[g].channels[c].notify {
+					continue
+				}
+				channels_to_notify.push(self.guilds[g].channels[c].id.clone());
+			}
+		}
+		
+		let app_state = state::AppState {
+			bot_token: self.bot_token.clone(),
+			channels_to_notify: channels_to_notify,
+			dm_channels: HashMap::new(),
+		};
+		let _ = state::save_state(&app_state, save_path().as_path());
+	}
 }
 
 pub fn hex_str_to_color(hex_str: &str) -> egui::Color32 {
 	egui::Color32::from_hex(hex_str).unwrap_or_else(|_| egui::Color32::WHITE)
 }
+
+pub fn save_path() -> PathBuf {
+	get_my_home()
+		.unwrap()
+		.unwrap()
+		.as_path()
+		.join(".jiji")
+		.join("save.json")
+		.to_path_buf()
+}
+
