@@ -49,6 +49,7 @@ struct Jiji {
 	time_watch: f32,
 	pending_bot_requests: usize,
 	current_message: String,
+	channels_to_notify: Vec<String>,
 }
 
 impl Jiji {
@@ -63,6 +64,7 @@ impl Jiji {
 			time_watch: 0.0,
 			pending_bot_requests: 0,
 			current_message: "".into(),
+			channels_to_notify: vec![],
 		}
 	}
 }
@@ -115,7 +117,9 @@ impl eframe::App for Jiji {
 						
 						if unkown_channel {
 							println!("gui : unkown channel");
-							self.guilds[guild_index].channels.push(discord_structure::Channel::new(message.channel_id.clone(), message.channel_id, message.guild_id));
+							self.guilds[guild_index].channels.push(discord_structure::Channel::create(message.channel_id.clone(), message.channel_id.clone(), message.guild_id.clone()));
+							let last = self.guilds[guild_index].channels.len() - 1;
+							self.guilds[guild_index].channels[last].insert(message.clone());
 						}
 					} else {
 						println!("gui : message guild issue : '{}'", message.guild_id);
@@ -218,7 +222,7 @@ impl Jiji {
 					if let Some(selected_guild_index) = &self.selected_guild {
 						if self.guilds[*selected_guild_index].channels.len() != 0 {
 							let selected_channel_text = if let Some(selected_channel_index) = &self.selected_channel {
-								self.guilds[*selected_guild_index].channels[*selected_channel_index].name.clone()
+								self.guilds[*selected_guild_index].channels[*selected_channel_index].display()
 							} else {
 								"None".to_string()
 							};
@@ -232,7 +236,7 @@ impl Jiji {
 										self.selected_channel = None;
 									}
 									for i in 0..self.guilds[*selected_guild_index].channels.len() {
-										if ui.add(egui::SelectableLabel::new(self.selected_channel == Some(i), self.guilds[*selected_guild_index].channels[i].name.clone())).clicked() {
+										if ui.add(egui::SelectableLabel::new(self.selected_channel == Some(i), self.guilds[*selected_guild_index].channels[i].display())).clicked() {
 											self.selected_channel = Some(i);
 											if self.guilds[*selected_guild_index].channels[i].messages.len() == 1 {
 												let _ = self.sender.send(postman::Packet::FetchMessages(self.guilds[*selected_guild_index].id.clone(), self.guilds[*selected_guild_index].channels[i].id.clone(), "".into()));
@@ -243,6 +247,9 @@ impl Jiji {
 									}
 								});
 							
+							if let Some(selected_channel_index) = &self.selected_channel {
+								ui.checkbox(&mut self.guilds[*selected_guild_index].channels[*selected_channel_index].notify, "notify");
+							}
 						}
 					}
 				});
@@ -292,10 +299,14 @@ impl Jiji {
 					.show(ui, |ui| {
 				if let Some(selected_guild_index) = &self.selected_guild {
 					if let Some(selected_channel_index) = &self.selected_channel {
+						self.guilds[*selected_guild_index].channels[*selected_channel_index].unread = false;
+						
 						let mut last_author = "".to_string();
+						
 						if self.guilds[*selected_guild_index].channels[*selected_channel_index].messages.len() < 2 {
 							return
 						}
+						
 						for message in &self.guilds[*selected_guild_index].channels[*selected_channel_index].messages {							
 							if message.author_name == "+" {
 								if ui.button("+").clicked() {

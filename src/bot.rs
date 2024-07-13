@@ -45,11 +45,11 @@ impl EventHandler for Handler {
 			let guild_id = if let Some(id) = msg.guild_id {
 				id.to_string()
 			} else {
-				let private_channel = discord_structure::Channel::new(author_name.clone(), msg.channel_id.to_string(), "dm".to_string());
+				let private_channel = discord_structure::Channel::create(author_name.clone(), msg.channel_id.to_string(), "dm".to_string());
 				sender.send(postman::Packet::Channel(private_channel)).expect("failed to send packet");
 				"dm".to_string()
 			};
-			let discord_message = discord_structure::Message::new(msg.id.to_string(), msg.channel_id.to_string(), guild_id, author_name, msg.content.clone(), msg.timestamp.to_rfc2822());
+			let discord_message = discord_structure::Message::create(msg.id.to_string(), msg.channel_id.to_string(), guild_id, author_name, msg.content.clone(), msg.timestamp.to_rfc2822()).new();
 			sender.send(postman::Packet::Message(discord_message)).expect("failed to send packet");
 		} else {
 			println!("bot : failed to retrieve sender");
@@ -177,7 +177,7 @@ async fn get_channels(context: &Context, guild_id_str: String) -> Result<(), Str
 				if channel.kind != ChannelType::Text {
 					continue
 				}
-				let discord_channel = discord_structure::Channel::new(channel.name, format!("{}",channel_id), guild_id_str.to_string());
+				let discord_channel = discord_structure::Channel::create(channel.name, format!("{}",channel_id), guild_id_str.to_string());
 				sender.send(postman::Packet::Channel(discord_channel)).map_err(|e| e.to_string())?;
 			}
 			sender.send(postman::Packet::FinishedRequest).map_err(|e| e.to_string())?;
@@ -209,7 +209,7 @@ async fn get_messages(context: &Context, guild_id_str: String, channel_id_str: S
 				
 		for message in &messages {
 			let author_name = message.author.name.clone();
-			let discord_message = discord_structure::Message::new(message.id.to_string(), channel_id_str.clone(), guild_id_str.clone(), author_name, message.content.clone(), message.timestamp.to_rfc2822());
+			let discord_message = discord_structure::Message::create(message.id.to_string(), channel_id_str.clone(), guild_id_str.clone(), author_name, message.content.clone(), message.timestamp.to_rfc2822());
 			sender.send(postman::Packet::Message(discord_message)).map_err(|e| e.to_string())?;
 		}
 		
@@ -229,13 +229,13 @@ async fn get_guilds(context: &Context) {
 	let guilds = context.cache.guilds().await;
 		
 	if let Some(sender) = context.data.read().await.get::<postman::Sender>() {
-		let personal_messages = discord_structure::Guild::new("dm".to_string(), "dm".to_string());
+		let personal_messages = discord_structure::Guild::create("dm".to_string(), "dm".to_string());
 		sender.send(postman::Packet::Guild(personal_messages)).expect("Failed to send packet");
 		
 		for guild_id in guilds {
 			if let Some(guild) = context.cache.guild(guild_id).await {
 				println!("bot : found guild '{}'", guild.name.clone());
-				let discord_guild = discord_structure::Guild::new(guild.name.clone(), guild_id.to_string());
+				let discord_guild = discord_structure::Guild::create(guild.name.clone(), guild_id.to_string());
 				sender.send(postman::Packet::Guild(discord_guild)).expect("Failed to send packet");
 				
 			} else {

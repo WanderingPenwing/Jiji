@@ -8,7 +8,7 @@ pub struct Guild {
 }
 
 impl Guild {
-	pub fn new(name: String, id: String) -> Self {
+	pub fn create(name: String, id: String) -> Self {
 		Self {
 			name,
 			id,
@@ -38,19 +38,27 @@ pub struct Channel {
 	pub id: String,
 	pub guild_id: String,
 	pub messages: Vec<Message>,
+	pub notify: bool,
+	pub unread: bool,
 }
 
 impl Channel {
-	pub fn new(name: String, id: String, guild_id: String) -> Self {
+	pub fn create(name: String, id: String, guild_id: String) -> Self {
 		Self {
 			name,
 			id: id.clone(),
 			guild_id : guild_id.clone(),
-			messages: vec![Message::new("0".into(), id, guild_id, "+".into(), "".into(), "".into())],
+			messages: vec![Message::create("0".into(), id, guild_id, "+".into(), "".into(), "".into())],
+			notify: false,
+			unread: false,
 		}
 	}
 	
 	pub fn insert(&mut self, message: Message) {
+		if message.new != "" {
+			self.unread = true;
+		}
+	
 		match self.get_index_from_timestamp(&message.timestamp) {
 			Ok(index) => {
 				self.messages.insert(index, message);
@@ -88,6 +96,20 @@ impl Channel {
 		}
 		self.messages.remove(0);
 	}
+	
+	pub fn display(&self) -> String {
+		let notify = if self.notify {
+			" !"
+		} else {
+			""
+		};
+		let unread = if self.unread {
+			"~ "
+		} else {
+			""
+		};
+		format!("{}{}{}", unread, self.name, notify)
+	}
 }
 
 #[derive(PartialEq, Clone)]
@@ -98,10 +120,11 @@ pub struct Message {
 	pub author_name: String,
 	pub content: String,
 	pub timestamp: String,
+	pub new: String,
 }
 
 impl Message {
-	pub fn new(id: String, channel_id: String, guild_id: String, author_name: String, content: String, timestamp: String) -> Self {
+	pub fn create(id: String, channel_id: String, guild_id: String, author_name: String, content: String, timestamp: String) -> Self {
 		Self {
 			id,
 			channel_id,
@@ -109,6 +132,12 @@ impl Message {
 			author_name,
 			content,
 			timestamp,
+			new: "".to_string(),
 		}
+	}
+	pub fn new(&mut self) -> Self {
+		let mut updated = self.clone();
+		updated.new = "yes".to_string();
+		updated
 	}
 }
