@@ -47,6 +47,7 @@ struct Jiji {
 	next_frame: time::Instant,
 	sender: mpsc::Sender<postman::Packet>,
 	receiver: mpsc::Receiver<postman::Packet>,
+	show_token: bool,
 	bot_token: String,
 	guilds: Vec<discord_structure::Guild>,
 	selected_guild: Option<usize>,
@@ -61,12 +62,19 @@ impl Jiji {
 	fn new(sender: mpsc::Sender<postman::Packet>, receiver: mpsc::Receiver<postman::Packet>) -> Self {
 		let app_state = state::load_state(&save_path());
 		
+		let mut dms = discord_structure::Guild::create("dm".to_string(), "dm".to_string());
+		
+		for (id, name) in &app_state.dm_channels {
+			dms.add_channel(discord_structure::Channel::create(name.to_string(), id.to_string(), dms.id.clone()));
+		}
+		
 		Self {
 			next_frame: time::Instant::now(),
 			sender,
 			receiver,
+			show_token: false,
 			bot_token: app_state.bot_token.clone(),
-			guilds: vec![],
+			guilds: vec![dms],
 			selected_guild: None,
 			selected_channel: None,
 			time_watch: 0.0,

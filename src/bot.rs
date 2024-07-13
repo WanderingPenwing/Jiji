@@ -228,10 +228,7 @@ async fn get_messages(context: &Context, guild_id_str: String, channel_id_str: S
 async fn get_guilds(context: &Context) {
 	let guilds = context.cache.guilds().await;
 		
-	if let Some(sender) = context.data.read().await.get::<postman::Sender>() {
-		let personal_messages = discord_structure::Guild::create("dm".to_string(), "dm".to_string());
-		sender.send(postman::Packet::Guild(personal_messages)).expect("Failed to send packet");
-		
+	if let Some(sender) = context.data.read().await.get::<postman::Sender>() {		
 		for guild_id in guilds {
 			if let Some(guild) = context.cache.guild(guild_id).await {
 				println!("bot : found guild '{}'", guild.name.clone());

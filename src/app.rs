@@ -107,20 +107,25 @@ impl Jiji {
 	
 	pub fn save_state(&self) {
 		let mut channels_to_notify = self.channels_to_notify.clone();
+		let mut dm_channels = HashMap::new();
 		
 		for g in 0..self.guilds.len() {
 			for c in 0..self.guilds[g].channels.len() {
+				if self.guilds[g].id == "dm" {
+					dm_channels.insert(self.guilds[g].channels[c].id.clone(), self.guilds[g].channels[c].name.clone());
+				}
 				if !self.guilds[g].channels[c].notify {
 					continue
 				}
 				channels_to_notify.push(self.guilds[g].channels[c].id.clone());
 			}
+			
 		}
 		
 		let app_state = state::AppState {
 			bot_token: self.bot_token.clone(),
 			channels_to_notify: channels_to_notify,
-			dm_channels: HashMap::new(),
+			dm_channels: dm_channels,
 		};
 		let _ = state::save_state(&app_state, save_path().as_path());
 	}
