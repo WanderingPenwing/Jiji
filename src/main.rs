@@ -3,13 +3,14 @@ use std::{sync::Arc, sync::mpsc, thread, time};
 use tokio::runtime::Runtime;
 use std::sync::Mutex;
 use std::path::PathBuf;
-use std::collections::HashMap;
 use homedir::get_my_home;
 
 mod bot;
 mod postman;
 mod discord_structure;
 mod state;
+mod ui;
+mod app;
 
 const MAX_FPS: f32 = 30.0;
 const RUNNING_REQUEST_REFRESH_DELAY: f32 = 0.2;
@@ -83,100 +84,7 @@ impl eframe::App for Jiji {
 		));
 		self.next_frame = time::Instant::now();
 		
-		while let Ok(packet) = self.receiver.try_recv() {
-			match packet {
-				postman::Packet::Guild(guild) => {
-					println!("gui : guild received : '{}'", guild.name);
-					self.guilds.push(guild);
-				}
-				postman::Packet::Channel(channel) => {
-					println!("gui : channel received : '{}'", channel.name);
-					for i in 0..self.guilds.len() {
-						if self.guilds[i].id != channel.guild_id {
-							continue
-						}
-						
-						let mut discord_channel = channel.clone(); // finish if with variable clone of channel to update with notify
-						
-						if let Some(index) = self.channels_to_notify.iter().position(|x| x == &channel.id) {
-							discord_channel.notify = true;
-							self.channels_to_notify.remove(index);
-						}
-						
-						self.guilds[i].add_channel(discord_channel.clone());
-						
-							
-					}
-				}
-				postman::Packet::Message(message) => {
-					println!("gui : message received : '{}'", message.content);
-					
-					let mut guild: Option<usize> = None;
-					
-					for i in 0..self.guilds.len() {
-						if self.guilds[i].id != message.guild_id {
-							continue
-						}
-						guild = Some(i);
-					}
-					
-					
-					if let Some(guild_index) = guild {
-						let mut unkown_channel = true;
-						for i in 0..self.guilds[guild_index].channels.len() {
-							if self.guilds[guild_index].channels[i].id != message.channel_id {
-								continue
-							}
-							self.guilds[guild_index].channels[i].insert(message.clone());
-							unkown_channel = false;
-							println!("gui : message put in : '{}'", self.guilds[guild_index].channels[i].name);
-						}
-						
-						if unkown_channel {
-							println!("gui : unkown channel");
-							self.guilds[guild_index].channels.push(discord_structure::Channel::create(message.channel_id.clone(), message.channel_id.clone(), message.guild_id.clone()));
-							let last = self.guilds[guild_index].channels.len() - 1;
-							self.guilds[guild_index].channels[last].insert(message.clone());
-						}
-					} else {
-						println!("gui : message guild issue : '{}'", message.guild_id);
-						
-						println!("gui : guilds {:?}", self.guilds.clone().into_iter().map(|guild| { guild.id.clone()}).collect::<Vec<String>>());
-					}
-				}
-				postman::Packet::ChannelEnd(guild_id, channel_id) => {
-					println!("gui : end of channel : '{}'", channel_id);
-					
-					let mut guild: Option<usize> = None;
-					
-					for i in 0..self.guilds.len() {
-						if self.guilds[i].id != guild_id {
-							continue
-						}
-						guild = Some(i);
-					}
-					
-					if let Some(guild_index) = guild {
-						for i in 0..self.guilds[guild_index].channels.len() {
-							if self.guilds[guild_index].channels[i].id != channel_id {
-								continue
-							}
-							self.guilds[guild_index].channels[i].end();
-						}
-					}
-					
-				}
-				postman::Packet::Error(reason) => {
-					println!("gui : error received {}", reason);
-				}
-				postman::Packet::FinishedRequest => {
-					self.pending_bot_requests = self.pending_bot_requests.checked_sub(1).unwrap_or(0);
-				}
-				_ => {
-					println!("gui : unhandled packet");
-				}
-			}
-		}
+		self.handle_packets();
 		
 		self.draw_selection(ctx);
 		
@@ -197,189 +105,6 @@ impl eframe::App for Jiji {
 	}
 }
 
-impl Jiji {
-	pub fn draw_selection(&mut self, ctx: &egui::Context) {
-		egui::TopBottomPanel::top("server_selection")
-			.resizable(false)
-			.show(ctx, |ui| {
-				ui.horizontal(|ui| {
-					ui.label("Where do you want to look ? ");
-					let selected_guild_text = if let Some(selected_guild_index) = &self.selected_guild {
-						self.guilds[*selected_guild_index].name.clone()
-					} else {
-						"None".to_string()
-					};
-					
-					egui::ComboBox::from_label("")
-						.selected_text(format!("{}", selected_guild_text))
-						.show_ui(ui, |ui| {
-							ui.style_mut().wrap = Some(false);
-							ui.set_min_width(60.0);
-							if ui.add(egui::SelectableLabel::new(self.selected_guild == None, "None")).clicked() {
-								self.selected_guild = None;
-								self.selected_channel = None;
-							}
-							for i in 0..self.guilds.len() {
-								if ui.add(egui::SelectableLabel::new(self.selected_guild == Some(i), self.guilds[i].name.clone())).clicked() {
-									self.selected_guild = Some(i);
-									self.selected_channel = None;
-									
-									if self.guilds[i].channels.len() == 0 && self.guilds[i].id != "dm" {
-										let _ = self.sender.send(postman::Packet::FetchChannels(self.guilds[i].id.clone()));
-										
-										self.pending_bot_requests += 1;
-									}
-									
-								}
-							}
-						});
-						
-					
-					//let _ = self.sender.send(postman::Packet::FetchChannels(self.guilds[*selected_guild_index].id.clone()));
-					if let Some(selected_guild_index) = &self.selected_guild {
-						if self.guilds[*selected_guild_index].channels.len() != 0 {
-							let selected_channel_text = if let Some(selected_channel_index) = &self.selected_channel {
-								self.guilds[*selected_guild_index].channels[*selected_channel_index].display()
-							} else {
-								"None".to_string()
-							};
-							
-							egui::ComboBox::from_label(":")
-								.selected_text(format!("{}", selected_channel_text))
-								.show_ui(ui, |ui| {
-									ui.style_mut().wrap = Some(false);
-									ui.set_min_width(60.0);
-									if ui.add(egui::SelectableLabel::new(self.selected_channel == None, "None")).clicked() {
-										self.selected_channel = None;
-									}
-									for i in 0..self.guilds[*selected_guild_index].channels.len() {
-										if ui.add(egui::SelectableLabel::new(self.selected_channel == Some(i), self.guilds[*selected_guild_index].channels[i].display())).clicked() {
-											self.selected_channel = Some(i);
-											if self.guilds[*selected_guild_index].channels[i].messages.len() == 1 {
-												let _ = self.sender.send(postman::Packet::FetchMessages(self.guilds[*selected_guild_index].id.clone(), self.guilds[*selected_guild_index].channels[i].id.clone(), "".into()));
-												
-												self.pending_bot_requests += 1;
-											}
-										}
-									}
-								});
-							
-							if let Some(selected_channel_index) = &self.selected_channel {
-								ui.checkbox(&mut self.guilds[*selected_guild_index].channels[*selected_channel_index].notify, "notify");
-							}
-						}
-					}
-				});
-			});
-		
-	}
-	
-	pub fn draw_infobar(&mut self, ctx: &egui::Context) {
-		egui::TopBottomPanel::bottom("infobar")
-			.resizable(false)
-			.show(ctx, |ui| {
-				if let Some(guild_index) = self.selected_guild {
-					if let Some(channel_index) = self.selected_channel {
-						ui.label("");
-						ui.horizontal(|ui| {
-							if ui.button(">").clicked() {
-								let _ = self.sender.send(postman::Packet::SendMessage(self.guilds[guild_index].channels[channel_index].id.clone(), self.current_message.clone()));
-								self.current_message = "".to_string();
-							}
-							egui::ScrollArea::vertical()
-								.show(ui, |ui| {
-									let _response = ui.add(egui::TextEdit::multiline(&mut self.current_message)
-										.desired_width(f32::INFINITY)
-										.lock_focus(true));
-								});
-						});
-					}
-				}
-				ui.horizontal(|ui| {
-					ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
-						ui.label(&format!("time per frame : {:.1} ms", self.time_watch));
-						
-						ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
-							if self.pending_bot_requests > 0 {
-								ui.label(&format!(" {} pending", self.pending_bot_requests));
-							}
-						});
-					});
-				});
-			});
-	}
-	
-	pub fn draw_feed(&mut self, ctx: &egui::Context) {
-		egui::CentralPanel::default().show(ctx, |ui| {
-			egui::ScrollArea::vertical()
-					.stick_to_bottom(true)
-					.show(ui, |ui| {
-				if let Some(selected_guild_index) = &self.selected_guild {
-					if let Some(selected_channel_index) = &self.selected_channel {
-						self.guilds[*selected_guild_index].channels[*selected_channel_index].unread = false;
-						
-						let mut last_author = "".to_string();
-						
-						if self.guilds[*selected_guild_index].channels[*selected_channel_index].messages.len() < 2 {
-							return
-						}
-						
-						for message in &self.guilds[*selected_guild_index].channels[*selected_channel_index].messages {							
-							if message.author_name == "+" {
-								if ui.button("+").clicked() {
-									if let Some(selected_guild_index) = &self.selected_guild {
-										if let Some(selected_channel_index) = &self.selected_channel {
-											let _ = self.sender.send(postman::Packet::FetchMessages(
-												self.guilds[*selected_guild_index].id.clone(), 
-												self.guilds[*selected_guild_index].channels[*selected_channel_index].id.clone(), 
-												self.guilds[*selected_guild_index].channels[*selected_channel_index].messages[1].id.clone(),
-											));
-											self.pending_bot_requests += 1;
-										}
-									}
-								}
-								continue
-							}
-							if message.author_name != last_author {
-								ui.separator();
-								ui.colored_label(hex_str_to_color("#3399ff"), &message.author_name);
-							} else {
-								ui.label("");
-							}
-							ui.label(&message.content);
-							last_author = message.author_name.clone();
-						}
-					}
-				}
-			});
-		});
-	}
-	
-	pub fn save_state(&self) {
-		let mut channels_to_notify = self.channels_to_notify.clone();
-		
-		for g in 0..self.guilds.len() {
-			for c in 0..self.guilds[g].channels.len() {
-				if !self.guilds[g].channels[c].notify {
-					continue
-				}
-				channels_to_notify.push(self.guilds[g].channels[c].id.clone());
-			}
-		}
-		
-		let app_state = state::AppState {
-			bot_token: self.bot_token.clone(),
-			channels_to_notify: channels_to_notify,
-			dm_channels: HashMap::new(),
-		};
-		let _ = state::save_state(&app_state, save_path().as_path());
-	}
-}
-
-pub fn hex_str_to_color(hex_str: &str) -> egui::Color32 {
-	egui::Color32::from_hex(hex_str).unwrap_or_else(|_| egui::Color32::WHITE)
-}
-
 pub fn save_path() -> PathBuf {
 	get_my_home()
 		.unwrap()
@@ -389,4 +114,3 @@ pub fn save_path() -> PathBuf {
 		.join("save.json")
 		.to_path_buf()
 }
-
