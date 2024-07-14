@@ -63,6 +63,7 @@ impl Jiji {
 						} else {
 							println!("app: unknown channel");
 							self.guilds[guild_index].channels.push(discord_structure::Channel::create(message.channel_id.clone(), message.channel_id.clone(), message.guild_id.clone()));
+							let _ = self.sender.send(postman::Packet::FetchChannels(self.guilds[guild_index].id.clone()));
 							self.guilds[guild_index].channels.len() - 1
 						};
 						
@@ -71,9 +72,15 @@ impl Jiji {
 						}
 						
 						if self.guilds[guild_index].channels[channel_index].notify && message.new != "" {
+							let mut body_text = format!("{} - {}", self.guilds[guild_index].name, self.guilds[guild_index].channels[channel_index].name);
+							
+							if self.guilds[guild_index].id == "dm" {
+								body_text = format!("{}", self.guilds[guild_index].name);
+							}
+							
 							let _ = Notification::new()
 								.summary(&message.author_name)
-								.body(&format!("{} - {}", self.guilds[guild_index].name, self.guilds[guild_index].channels[channel_index].name))
+								.body(&body_text)
 								.timeout(0)
 								.show();
 						}

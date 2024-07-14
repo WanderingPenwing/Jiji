@@ -1,4 +1,5 @@
 use chrono::{DateTime, ParseError};
+use notify_rust::Notification;
 
 #[derive(PartialEq, Clone)]
 pub struct Guild {
@@ -21,11 +22,24 @@ impl Guild {
 	pub fn add_channel(&mut self, channel: Channel) {
 		let mut already_exist = false;
 		
-		for existing_channel in self.channels.clone() {
-			if existing_channel.id != channel.id {
+		for i in 0..self.channels.len() {
+			if self.channels[i].id != channel.id {
 				continue
 			}
 			already_exist = true;
+			
+			self.channels[i].name = channel.name.clone();
+			
+			if channel.notify && !self.channels[i].notify {
+				self.channels[i].notify = true;
+				if self.channels[i].messages.len() > 0 {
+					let _ = Notification::new()
+						.summary(&self.channels[i].messages[self.channels[i].messages.len() - 1].author_name)
+						.body(&format!("{} - {}", self.name, self.channels[i].name))
+						.timeout(0)
+						.show();
+				}
+			}
 		}
 		
 		if !already_exist {
