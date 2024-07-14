@@ -11,7 +11,7 @@ impl Jiji {
 				ui.horizontal(|ui| {
 					ui.label("Where do you want to look ? ");
 					let selected_guild_text = if let Some(selected_guild_index) = &self.selected_guild {
-						self.guilds[*selected_guild_index].name.clone()
+						self.guilds[*selected_guild_index].display()
 					} else {
 						"None".to_string()
 					};
@@ -22,11 +22,27 @@ impl Jiji {
 							ui.style_mut().wrap = Some(false);
 							ui.set_min_width(60.0);
 							if ui.add(egui::SelectableLabel::new(self.selected_guild == None, "None")).clicked() {
+							
+								if let Some(selected_guild_index) = &self.selected_guild {
+									if let Some(selected_channel_index) = &self.selected_channel {
+										self.guilds[*selected_guild_index].channels[*selected_channel_index].unread = false;
+										self.guilds[*selected_guild_index].check_unread();
+									}
+								}
+											
 								self.selected_guild = None;
 								self.selected_channel = None;
 							}
 							for i in 0..self.guilds.len() {
-								if ui.add(egui::SelectableLabel::new(self.selected_guild == Some(i), self.guilds[i].name.clone())).clicked() {
+								if ui.add(egui::SelectableLabel::new(self.selected_guild == Some(i), self.guilds[i].display())).clicked() {
+								
+									if let Some(selected_guild_index) = &self.selected_guild {
+										if let Some(selected_channel_index) = &self.selected_channel {
+											self.guilds[*selected_guild_index].channels[*selected_channel_index].unread = false;
+											self.guilds[*selected_guild_index].check_unread();
+										}
+									}
+									
 									self.selected_guild = Some(i);
 									self.selected_channel = None;
 									
@@ -56,11 +72,21 @@ impl Jiji {
 									ui.style_mut().wrap = Some(false);
 									ui.set_min_width(60.0);
 									if ui.add(egui::SelectableLabel::new(self.selected_channel == None, "None")).clicked() {
+										if let Some(selected_channel_index) = &self.selected_channel {
+											self.guilds[*selected_guild_index].channels[*selected_channel_index].unread = false;
+										}
 										self.selected_channel = None;
 									}
 									for i in 0..self.guilds[*selected_guild_index].channels.len() {
 										if ui.add(egui::SelectableLabel::new(self.selected_channel == Some(i), self.guilds[*selected_guild_index].channels[i].display())).clicked() {
+											
+											if let Some(selected_channel_index) = &self.selected_channel {
+												self.guilds[*selected_guild_index].channels[*selected_channel_index].unread = false;
+												self.guilds[*selected_guild_index].check_unread();
+											}
+											
 											self.selected_channel = Some(i);
+											
 											if self.guilds[*selected_guild_index].channels[i].messages.len() == 1 {
 												let _ = self.sender.send(postman::Packet::FetchMessages(self.guilds[*selected_guild_index].id.clone(), self.guilds[*selected_guild_index].channels[i].id.clone(), "".into()));
 												
@@ -122,7 +148,6 @@ impl Jiji {
 					.show(ui, |ui| {
 				if let Some(selected_guild_index) = &self.selected_guild {
 					if let Some(selected_channel_index) = &self.selected_channel {
-						self.guilds[*selected_guild_index].channels[*selected_channel_index].unread = false;
 						
 						let mut last_author = "".to_string();
 						

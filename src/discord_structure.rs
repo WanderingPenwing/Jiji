@@ -5,6 +5,7 @@ pub struct Guild {
 	pub name: String,
 	pub id: String,
 	pub channels: Vec<Channel>,
+	pub unread: bool,
 }
 
 impl Guild {
@@ -13,6 +14,7 @@ impl Guild {
 			name,
 			id,
 			channels: vec![],
+			unread: false,
 		}
 	}
 	
@@ -29,6 +31,25 @@ impl Guild {
 		if !already_exist {
 			self.channels.insert(0, channel.clone())
 		}
+	}
+	
+	pub fn check_unread(&mut self) {
+		self.unread = false;
+		
+		for channel in &self.channels {
+			if channel.unread {
+				self.unread = true;
+			}
+		}
+	}
+	
+	pub fn display(&self) -> String {
+		let unread = if self.unread {
+			"~ "
+		} else {
+			""
+		};
+		format!("{}{}", unread, self.name)
 	}
 }
 
@@ -54,7 +75,7 @@ impl Channel {
 		}
 	}
 	
-	pub fn insert(&mut self, message: Message) {
+	pub fn insert(&mut self, message: Message) -> bool {
 		if message.new != "" {
 			self.unread = true;
 		}
@@ -69,6 +90,7 @@ impl Channel {
 			}
 		}
 		
+		self.unread
 	}
 	
 	pub fn get_index_from_timestamp(&self, message_timestamp: &str) -> Result<usize, ParseError> {

@@ -60,12 +60,19 @@ struct Jiji {
 
 impl Jiji {
 	fn new(sender: mpsc::Sender<postman::Packet>, receiver: mpsc::Receiver<postman::Packet>) -> Self {
-		let app_state = state::load_state(&save_path());
+		let mut app_state = state::load_state(&save_path());
 		
 		let mut dms = discord_structure::Guild::create("dm".to_string(), "dm".to_string());
 		
 		for (id, name) in &app_state.dm_channels {
-			dms.add_channel(discord_structure::Channel::create(name.to_string(), id.to_string(), dms.id.clone()));
+			let mut channel = discord_structure::Channel::create(name.to_string(), id.to_string(), dms.id.clone());
+			
+			if let Some(index) = app_state.channels_to_notify.iter().position(|x| x == &channel.id) {
+				channel.notify = true;
+				app_state.channels_to_notify.remove(index);
+			}
+			
+			dms.add_channel(channel);
 		}
 		
 		Self {
