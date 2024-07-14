@@ -28,7 +28,11 @@ impl Guild {
 			}
 			already_exist = true;
 			
-			self.channels[i].name = channel.name.clone();
+			if self.channels[i].name.parse::<u64>().is_ok() {
+				self.channels[i].name = channel.name.clone();
+			} else {
+				println!("discord_structure : channel already exist but name is not id '{}'",self.channels[i].name);
+			}
 			
 			if channel.notify && !self.channels[i].notify {
 				self.channels[i].notify = true;
@@ -171,9 +175,7 @@ impl Message {
 			new: "".to_string(),
 		}
 	}
-	pub fn new(&mut self) -> Self {
-		let mut updated = self.clone();
-		updated.new = "yes".to_string();
-		updated
+	pub fn new(&mut self) {
+		self.new = "yes".to_string();
 	}
 }

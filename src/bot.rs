@@ -47,7 +47,11 @@ impl EventHandler for Handler {
 				sender.send(postman::Packet::Channel(private_channel)).expect("failed to send packet");
 				"dm".to_string()
 			};
-			let discord_message = discord_structure::Message::create(msg.id.to_string(), msg.channel_id.to_string(), guild_id, author_name, msg.content.clone(), msg.timestamp.to_rfc2822()).new();
+			let mut discord_message = discord_structure::Message::create(msg.id.to_string(), msg.channel_id.to_string(), guild_id, author_name, msg.content.clone(), msg.timestamp.to_rfc2822());
+			
+			if context.cache.current_user().await.id != msg.author.id {
+				discord_message.new();
+			}
 			sender.send(postman::Packet::Message(discord_message)).expect("failed to send packet");
 		} else {
 			println!("bot : failed to retrieve sender");
