@@ -1,4 +1,5 @@
 use eframe::egui;
+use chrono::DateTime;
 
 use crate::postman;
 use crate::Jiji;
@@ -74,6 +75,7 @@ impl Jiji {
 									if ui.add(egui::SelectableLabel::new(self.selected_channel == None, "None")).clicked() {
 										if let Some(selected_channel_index) = &self.selected_channel {
 											self.guilds[*selected_guild_index].channels[*selected_channel_index].unread = false;
+											self.guilds[*selected_guild_index].check_unread();
 										}
 										self.selected_channel = None;
 									}
@@ -173,7 +175,12 @@ impl Jiji {
 							}
 							if message.author_name != last_author {
 								ui.separator();
-								ui.colored_label(hex_str_to_color("#3399ff"), &message.author_name);
+								ui.horizontal( |ui| {
+									ui.colored_label(hex_str_to_color("#3399ff"), &message.author_name);
+									if let Ok(timestamp) = DateTime::parse_from_rfc2822(&message.timestamp) {
+										ui.label(timestamp.format("%H:%M (%a, %e %b)").to_string());
+									}
+								});
 							} else {
 								ui.label("");
 							}
