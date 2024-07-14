@@ -23,7 +23,14 @@ impl Jiji {
 					self.errors.remove(index);
 				}
 				ui.horizontal(|ui| {
-					ui.label("Where do you want to look ? ");
+					if ui.button("⚙").clicked() {
+						self.edit_token = !self.edit_token;
+					}
+					if self.edit_token {
+						ui.label("Token :");
+						ui.add(egui::TextEdit::singleline(&mut self.bot_token).desired_width(30.0));
+					}
+					ui.label("  ");
 					let selected_guild_text = if let Some(selected_guild_index) = &self.selected_guild {
 						self.guilds[*selected_guild_index].display()
 					} else {

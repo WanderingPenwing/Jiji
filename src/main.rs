@@ -22,7 +22,9 @@ fn main() {
 	let (gui_tx, bot_rx) = mpsc::channel::<postman::Packet>(); //tx transmiter
 	let bot_rx = Mutex::new(bot_rx);
 	
-	let token = bot::token::TOKEN;
+	let app_state = state::load_state(&save_path());
+	
+	let token: String = app_state.bot_token.clone();//bot::token::TOKEN;
 	
 	let _handle = thread::spawn(move || {
 		println!("main : bot thread spawned");
@@ -52,6 +54,7 @@ struct Jiji {
 	sender: mpsc::Sender<postman::Packet>,
 	receiver: mpsc::Receiver<postman::Packet>,
 	bot_token: String,
+	edit_token: bool,
 	guilds: Vec<discord_structure::Guild>,
 	selected_guild: Option<usize>,
 	selected_channel: Option<usize>,
@@ -84,6 +87,7 @@ impl Jiji {
 			sender,
 			receiver,
 			bot_token: app_state.bot_token.clone(),
+			edit_token: false,
 			guilds: vec![dms],
 			selected_guild: None,
 			selected_channel: None,
