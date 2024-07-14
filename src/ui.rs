@@ -9,6 +9,19 @@ impl Jiji {
 		egui::TopBottomPanel::top("server_selection")
 			.resizable(false)
 			.show(ctx, |ui| {
+				let mut delete_error: Option<usize> = None;
+				for i in 0..self.errors.len() {
+					ui.horizontal(|ui| {
+						if ui.button("X").clicked() {
+							delete_error = Some(i);
+						}
+						ui.colored_label(hex_str_to_color("#dd5d5a"), &self.errors[i]);
+					});
+				}
+				
+				if let Some(index) = delete_error {
+					self.errors.remove(index);
+				}
 				ui.horizontal(|ui| {
 					ui.label("Where do you want to look ? ");
 					let selected_guild_text = if let Some(selected_guild_index) = &self.selected_guild {

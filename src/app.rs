@@ -99,6 +99,7 @@ impl Jiji {
 				}
 				postman::Packet::Error(reason) => {
 					println!("app : error received {}", reason);
+					self.errors.push(reason);
 				}
 				postman::Packet::FinishedRequest => {
 					self.pending_bot_requests = self.pending_bot_requests.checked_sub(1).unwrap_or(0);

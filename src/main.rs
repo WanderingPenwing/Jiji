@@ -56,6 +56,7 @@ struct Jiji {
 	pending_bot_requests: usize,
 	current_message: String,
 	channels_to_notify: Vec<String>,
+	errors: Vec<String>,
 }
 
 impl Jiji {
@@ -88,6 +89,7 @@ impl Jiji {
 			pending_bot_requests: 0,
 			current_message: "".into(),
 			channels_to_notify: app_state.channels_to_notify.clone(),
+			errors: vec![],
 		}
 	}
 }
