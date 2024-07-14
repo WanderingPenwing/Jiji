@@ -17,8 +17,6 @@ use tokio::time::interval;
 use crate::postman;
 use crate::discord_structure;
 
-pub mod token;
-
 const HELP_MESSAGE: &str = "Hello there, Human! I am a messenger for the wandering penwing.";
 const HELP_COMMAND: &str = "!penwing";
 const PACKET_REFRESH : u64 = 500;
