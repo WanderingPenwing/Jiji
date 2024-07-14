@@ -22,10 +22,12 @@ fn main() {
 	let (gui_tx, bot_rx) = mpsc::channel::<postman::Packet>(); //tx transmiter
 	let bot_rx = Mutex::new(bot_rx);
 	
+	let token = bot::token::TOKEN;
+	
 	let _handle = thread::spawn(move || {
 		println!("main : bot thread spawned");
 		let mut rt = Runtime::new().unwrap();
-		rt.block_on(bot::start_discord_bot(bot_tx, bot_rx));
+		rt.block_on(bot::start_discord_bot(token, bot_tx, bot_rx));
 	});
 
 	// Run the GUI on the main thread

@@ -17,7 +17,7 @@ use tokio::time::interval;
 use crate::postman;
 use crate::discord_structure;
 
-mod token;
+pub mod token;
 
 const HELP_MESSAGE: &str = "Hello there, Human! I am a messenger for the wandering penwing.";
 const HELP_COMMAND: &str = "!penwing";
@@ -245,13 +245,13 @@ async fn get_guilds(context: &Context) {
 	}
 }
 
-pub async fn start_discord_bot(sender: mpsc::Sender<postman::Packet>, receiver: Mutex<mpsc::Receiver<postman::Packet>>) {
+pub async fn start_discord_bot(token: &str, sender: mpsc::Sender<postman::Packet>, receiver: Mutex<mpsc::Receiver<postman::Packet>>) {
 	println!("bot : connection process started...");
-	let maybe_client = Client::builder(token::TOKEN)
+	let maybe_client = Client::builder(token)
 		.event_handler(Handler {
 			is_loop_running: AtomicBool::new(false),
 		})
-		.type_map_insert::<postman::Sender>(sender)
+		.type_map_insert::<postman::Sender>(sender.clone())
 		.type_map_insert::<postman::Receiver>(receiver)
 		.await
 		.map_err(|why| format!("Client error: {:?}", why));
@@ -259,13 +259,25 @@ pub async fn start_discord_bot(sender: mpsc::Sender<postman::Packet>, receiver: 
 	//let mut rx = bot_rx.lock().unwrap(); // Lock the receiver
 	//let msg = rx.recv().unwrap(); // Receive a message
 
-	if let Ok(mut client) = maybe_client {
-		if let Err(why) = client.start().await {
-			println!("bot : client error: {:?}", why);
-			return;
+//	if let Ok(mut client) = maybe_client {
+//		if let Err(why) = client.start().await {
+//			println!("bot : client error: {:?}", why);
+//			return;
+//		}
+//	} else {
+//		println!("bot : no client");
+//		return;
+//	}
+	
+	match maybe_client {
+		Ok(mut client) => {
+			if let Err(why) = client.start().await {
+				sender.send(postman::Packet::Error(format!("Start error: {:?}", why))).expect("Failed to send packet");
+				return;
+			}
 		}
-	} else {
-		println!("bot : no client");
-		return;
+		Err(why) => {
+			sender.send(postman::Packet::Error(why)).expect("Failed to send packet");
+		}
 	}
 }
