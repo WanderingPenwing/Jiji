@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use notify_rust::Notification;
 
 use crate::state;
 use crate::save_path;
@@ -67,6 +68,14 @@ impl Jiji {
 						
 						if self.guilds[guild_index].channels[channel_index].insert(message.clone()) {
 							self.guilds[guild_index].unread = true;
+						}
+						
+						if self.guilds[guild_index].channels[channel_index].notify && message.new != "" {
+							let _ = Notification::new()
+								.summary(&message.author_name)
+								.body(&format!("{} - {}", self.guilds[guild_index].name, self.guilds[guild_index].channels[channel_index].name))
+								.timeout(0)
+								.show();
 						}
 						
 					} else {

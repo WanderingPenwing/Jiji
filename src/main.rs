@@ -3,6 +3,7 @@ use std::{sync::Arc, sync::mpsc, thread, time};
 use tokio::runtime::Runtime;
 use std::sync::Mutex;
 use std::path::PathBuf;
+use std::time::Duration;
 use homedir::get_my_home;
 
 mod bot;
@@ -14,6 +15,7 @@ mod app;
 
 const MAX_FPS: f32 = 30.0;
 const RUNNING_REQUEST_REFRESH_DELAY: f32 = 0.2;
+const BACKGROUND_REFRESH_DELAY: f32 = 2.0;
 
 fn main() {
 	let (bot_tx, gui_rx) = mpsc::channel::<postman::Packet>(); //tx transmiter
@@ -47,7 +49,6 @@ struct Jiji {
 	next_frame: time::Instant,
 	sender: mpsc::Sender<postman::Packet>,
 	receiver: mpsc::Receiver<postman::Packet>,
-	show_token: bool,
 	bot_token: String,
 	guilds: Vec<discord_structure::Guild>,
 	selected_guild: Option<usize>,
@@ -80,7 +81,6 @@ impl Jiji {
 			next_frame: time::Instant::now(),
 			sender,
 			receiver,
-			show_token: false,
 			bot_token: app_state.bot_token.clone(),
 			guilds: vec![dms],
 			selected_guild: None,
@@ -111,10 +111,10 @@ impl eframe::App for Jiji {
 		
 		self.time_watch = self.next_frame.elapsed().as_micros() as f32 / 1000.0;
 		
-		if self.pending_bot_requests > 0 && !ctx.input(|i| i.wants_repaint()) {
-			thread::sleep(time::Duration::from_secs_f32(RUNNING_REQUEST_REFRESH_DELAY));
-			egui::Context::request_repaint(ctx);
+		if self.pending_bot_requests > 0 {
+			egui::Context::request_repaint_after(ctx, Duration::from_secs_f32(RUNNING_REQUEST_REFRESH_DELAY));
 		}
+		egui::Context::request_repaint_after(ctx, Duration::from_secs_f32(BACKGROUND_REFRESH_DELAY));
 	}
 
 	fn on_exit(&mut self, _gl: std::option::Option<&eframe::glow::Context>) {
