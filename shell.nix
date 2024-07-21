@@ -1,12 +1,5 @@
-{ pkgs ? import <nixpkgs> { overlays = [ (import (builtins.fetchTarball https://github.com/mozilla/nixpkgs-mozilla/archive/master.tar.gz)) ]; },
-  unstable ? import <nixos-unstable> { config = { allowUnfree = true; }; }
-}:
+{ pkgs ? import <nixpkgs> { overlays = [ (import (builtins.fetchTarball https://github.com/mozilla/nixpkgs-mozilla/archive/master.tar.gz)) ]; },}:
 with pkgs;
-
-let
-  # Specify Pillow as a build input
-  pillow = python3Packages.pillow;
-in
 
 mkShell {
   nativeBuildInputs = with xorg; [
@@ -17,8 +10,11 @@ mkShell {
     pkg-config
   ] ++ [
     cargo
-    unstable.rustc
-    python3
+    rustc
+    atk
+    gdk-pixbuf
+    webkitgtk
+    glib
     libGL
     libGLU
     libxkbcommon

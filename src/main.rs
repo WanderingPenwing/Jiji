@@ -63,6 +63,7 @@ struct Jiji {
 	current_message: String,
 	channels_to_notify: Vec<String>,
 	errors: Vec<String>,
+	redraw: bool,
 }
 
 impl Jiji {
@@ -96,6 +97,7 @@ impl Jiji {
 			current_message: "".into(),
 			channels_to_notify: app_state.channels_to_notify.clone(),
 			errors: vec![],
+			redraw: false,
 		}
 	}
 }
@@ -120,6 +122,10 @@ impl eframe::App for Jiji {
 		if self.pending_bot_requests > 0 {
 			egui::Context::request_repaint_after(ctx, Duration::from_secs_f32(RUNNING_REQUEST_REFRESH_DELAY));
 		}
+		if self.redraw {
+			egui::Context::request_repaint(ctx);
+			self.redraw = false;
+		}
 		egui::Context::request_repaint_after(ctx, Duration::from_secs_f32(BACKGROUND_REFRESH_DELAY));
 	}
 
@@ -133,7 +139,8 @@ pub fn save_path() -> PathBuf {
 		.unwrap()
 		.unwrap()
 		.as_path()
-		.join(".jiji")
+		.join(".config")
+		.join("jiji")
 		.join("save.json")
 		.to_path_buf()
 }

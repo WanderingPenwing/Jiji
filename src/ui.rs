@@ -1,5 +1,5 @@
 use eframe::egui;
-use chrono::DateTime;
+use chrono::{DateTime, Local};
 
 use crate::postman;
 use crate::Jiji;
@@ -165,31 +165,31 @@ impl Jiji {
 	
 	pub fn draw_feed(&mut self, ctx: &egui::Context) {
 		egui::CentralPanel::default().show(ctx, |ui| {
-			egui::ScrollArea::vertical()
-					.stick_to_bottom(true)
-					.show(ui, |ui| {
-				if let Some(selected_guild_index) = &self.selected_guild {
-					if let Some(selected_channel_index) = &self.selected_channel {
+			if let Some(selected_guild_index) = &self.selected_guild {
+				if let Some(selected_channel_index) = &self.selected_channel {
+					let selected_guild = &mut self.guilds[*selected_guild_index];
+					let selected_channel = &mut selected_guild.channels[*selected_channel_index];
+					
+					let scrollarea_result = egui::ScrollArea::vertical()
+						.stick_to_bottom(true)
+						.vertical_scroll_offset(selected_channel.scroll_offset)
+						.show(ui, |ui| {
 						
 						let mut last_author = "".to_string();
 						
-						if self.guilds[*selected_guild_index].channels[*selected_channel_index].messages.len() < 2 {
+						if selected_channel.messages.len() < 2 {
 							return
 						}
 						
-						for message in &self.guilds[*selected_guild_index].channels[*selected_channel_index].messages {							
+						for message in &selected_channel.messages {							
 							if message.author_name == "+" {
 								if ui.button("+").clicked() {
-									if let Some(selected_guild_index) = &self.selected_guild {
-										if let Some(selected_channel_index) = &self.selected_channel {
-											let _ = self.sender.send(postman::Packet::FetchMessages(
-												self.guilds[*selected_guild_index].id.clone(), 
-												self.guilds[*selected_guild_index].channels[*selected_channel_index].id.clone(), 
-												self.guilds[*selected_guild_index].channels[*selected_channel_index].messages[1].id.clone(),
-											));
-											self.pending_bot_requests += 1;
-										}
-									}
+									let _ = self.sender.send(postman::Packet::FetchMessages(
+										selected_guild.id.clone(), 
+										selected_channel.id.clone(), 
+										selected_channel.messages[1].id.clone(),
+									));
+									self.pending_bot_requests += 1;
 								}
 								continue
 							}
@@ -198,7 +198,8 @@ impl Jiji {
 								ui.horizontal( |ui| {
 									ui.colored_label(hex_str_to_color("#3399ff"), &message.author_name);
 									if let Ok(timestamp) = DateTime::parse_from_rfc2822(&message.timestamp) {
-										ui.label(timestamp.format("%H:%M (%a, %e %b)").to_string());
+										let local_timestamp = timestamp.with_timezone(&Local);
+										ui.label(local_timestamp.format("%H:%M (%a, %e %b)").to_string());
 									}
 								});
 							} else {
@@ -207,9 +208,29 @@ impl Jiji {
 							ui.label(&message.content);
 							last_author = message.author_name.clone();
 						}
+					});
+					
+					let new_content_size = scrollarea_result.content_size[1];
+					let new_inner_size = scrollarea_result.inner_rect.max.y - scrollarea_result.inner_rect.min.y;
+					
+					if selected_channel.registered_messages != selected_channel.messages.len() {
+						if selected_channel.scroll_offset >= selected_channel.content_size - selected_channel.inner_size * 1.5 {
+							selected_channel.scroll_offset = new_content_size - new_inner_size; 
+						} else if selected_channel.scroll_offset < 1.0 {
+							selected_channel.scroll_offset = new_content_size - selected_channel.content_size;
+						}
+						
+						selected_channel.registered_messages = selected_channel.messages.len();
+						self.redraw = true;
+						
+					} else {
+						selected_channel.scroll_offset = scrollarea_result.state.offset[1];
 					}
+					
+					selected_channel.content_size = new_content_size;
+					selected_channel.inner_size = new_inner_size;
 				}
-			});
+			}
 		});
 	}
 }

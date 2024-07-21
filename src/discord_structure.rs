@@ -79,6 +79,10 @@ pub struct Channel {
 	pub messages: Vec<Message>,
 	pub notify: bool,
 	pub unread: bool,
+	pub scroll_offset: f32,
+	pub content_size: f32,
+	pub inner_size: f32,
+	pub registered_messages: usize,
 }
 
 impl Channel {
@@ -90,6 +94,10 @@ impl Channel {
 			messages: vec![Message::create("0".into(), id, guild_id, "+".into(), "".into(), "".into())],
 			notify: false,
 			unread: false,
+			scroll_offset: 0.0,
+			content_size: 0.0,
+			inner_size: 0.0,
+			registered_messages: 0,
 		}
 	}
 	
