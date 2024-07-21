@@ -4,6 +4,8 @@ use chrono::{DateTime, Local};
 use crate::postman;
 use crate::Jiji;
 
+const MESSAGE_EDIT_ROWS : usize = 4;
+
 impl Jiji {
 	pub fn draw_selection(&mut self, ctx: &egui::Context) {
 		egui::TopBottomPanel::top("server_selection")
@@ -136,14 +138,20 @@ impl Jiji {
 					if let Some(channel_index) = self.selected_channel {
 						ui.label("");
 						ui.horizontal(|ui| {
-							if ui.button(">").clicked() {
-								let _ = self.sender.send(postman::Packet::SendMessage(self.guilds[guild_index].channels[channel_index].id.clone(), self.current_message.clone()));
-								self.current_message = "".to_string();
-							}
+							ui.vertical(|ui| {
+								if ui.button(">").clicked() && self.current_message != "" {
+									let _ = self.sender.send(postman::Packet::SendMessage(self.guilds[guild_index].channels[channel_index].id.clone(), self.current_message.clone()));
+									self.current_message = "".to_string();
+								}
+								if ui.button("#").clicked() {
+									self.emoji_window.visible = !self.emoji_window.visible;
+								}
+							});
 							egui::ScrollArea::vertical()
 								.show(ui, |ui| {
 									let _response = ui.add(egui::TextEdit::multiline(&mut self.current_message)
 										.desired_width(f32::INFINITY)
+										.desired_rows(MESSAGE_EDIT_ROWS)
 										.lock_focus(true));
 								});
 						});

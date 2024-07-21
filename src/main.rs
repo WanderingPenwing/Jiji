@@ -12,6 +12,8 @@ mod discord_structure;
 mod state;
 mod ui;
 mod app;
+mod emoji_window;
+use emoji_window::EmojiWindow;
 
 const MAX_FPS: f32 = 30.0;
 const RUNNING_REQUEST_REFRESH_DELAY: f32 = 0.2;
@@ -64,6 +66,7 @@ struct Jiji {
 	channels_to_notify: Vec<String>,
 	errors: Vec<String>,
 	redraw: bool,
+	emoji_window: EmojiWindow,
 }
 
 impl Jiji {
@@ -98,6 +101,7 @@ impl Jiji {
 			channels_to_notify: app_state.channels_to_notify.clone(),
 			errors: vec![],
 			redraw: false,
+			emoji_window: EmojiWindow::new(),
 		}
 	}
 }
@@ -109,6 +113,18 @@ impl eframe::App for Jiji {
 		));
 		self.next_frame = time::Instant::now();
 		
+		//if ctx.input(|i| i.key_pressed(egui::Key::Enter) && i.modifiers.ctrl) {
+		if ctx.input_mut(|i| i.consume_shortcut(&egui::KeyboardShortcut::new(egui::Modifiers::CTRL, egui::Key::Enter))) {
+			if let Some(guild_index) = self.selected_guild {
+				if let Some(channel_index) = self.selected_channel {
+					if self.current_message != "" {
+						let _ = self.sender.send(postman::Packet::SendMessage(self.guilds[guild_index].channels[channel_index].id.clone(), self.current_message.clone()));
+						self.current_message = "".to_string();
+					}
+				}
+			}
+		}
+		
 		self.handle_packets();
 		
 		self.draw_selection(ctx);
@@ -116,6 +132,10 @@ impl eframe::App for Jiji {
 		self.draw_infobar(ctx);
 
 		self.draw_feed(ctx);
+		
+		if self.emoji_window.visible {
+			self.emoji_window.show(ctx);
+		}
 		
 		self.time_watch = self.next_frame.elapsed().as_micros() as f32 / 1000.0;
 		
